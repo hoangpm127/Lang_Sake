@@ -1,5 +1,219 @@
 ﻿"use client";
 
+import { useEffect, useState } from "react";
+
+type Booking = {
+  id: string;
+  customerName: string;
+  phone: string;
+  email?: string;
+  dateTime: string;
+  guests: number;
+  comboName: string;
+  finalTotal: number;
+  discount: number;
+  status: string;
+};
+
+export default function F2Dashboard() {
+  const [bookings, setBookings] = useState<Booking[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchBookings();
+  }, []);
+
+  const fetchBookings = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch("/api/bookings");
+      const data = await response.json();
+
+      if (data.ok) {
+        setBookings(data.bookings);
+      } else {
+        setError(data.message);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Lỗi tải dữ liệu");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const totalSpent = bookings
+    .filter((b) => b.status !== "CANCELLED")
+    .reduce((sum, b) => sum + b.finalTotal, 0);
+
+  const totalSaved = bookings.reduce((sum, b) => sum + b.discount, 0);
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat("vi-VN", {
+      style: "currency",
+      currency: "VND",
+    }).format(amount);
+  };
+
+  const formatDateTime = (dateTime: string) => {
+    return new Date(dateTime).toLocaleString("vi-VN", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "CONFIRMED":
+        return "bg-green-100 text-green-800";
+      case "PENDING":
+        return "bg-yellow-100 text-yellow-800";
+      case "COMPLETED":
+        return "bg-blue-100 text-blue-800";
+      case "CANCELLED":
+        return "bg-red-100 text-red-800";
+      default:
+        return "bg-gray-100 text-gray-800";
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-[#c9a24d] border-r-transparent"></div>
+          <p className="mt-4 text-sm text-[#8b857a]">Đang tải...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="rounded-3xl border border-red-200 bg-red-50 p-6">
+        <p className="text-red-800">❌ {error}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-8">
+      {/* Statistics Cards */}
+      <div className="grid gap-6 lg:grid-cols-3">
+        <div className="rounded-3xl border border-black/5 bg-white p-6 shadow-sm">
+          <p className="text-xs uppercase tracking-[0.2em] text-[#8b857a]">
+            Tổng bookings
+          </p>
+          <p className="mt-4 font-serif text-3xl text-[#1a1a1a]">
+            {bookings.length}
+          </p>
+        </div>
+
+        <div className="rounded-3xl border border-black/5 bg-white p-6 shadow-sm">
+          <p className="text-xs uppercase tracking-[0.2em] text-[#8b857a]">
+            Tổng chi tiêu
+          </p>
+          <p className="mt-4 font-serif text-3xl text-[#1a1a1a]">
+            {formatCurrency(totalSpent)}
+          </p>
+        </div>
+
+        <div className="rounded-3xl border border-black/5 bg-gradient-to-br from-green-500/10 to-green-500/5 p-6 shadow-sm border-green-500/20">
+          <p className="text-xs uppercase tracking-[0.2em] text-green-600">
+            Tiết kiệm được
+          </p>
+          <p className="mt-4 font-serif text-3xl text-green-600">
+            {formatCurrency(totalSaved)}
+          </p>
+          <p className="text-xs text-[#8b857a] mt-2">Nhờ ưu đãi thành viên</p>
+        </div>
+      </div>
+
+      {/* Bookings Table */}
+      <div className="rounded-3xl border border-black/5 bg-white shadow-sm overflow-hidden">
+        <div className="p-6 border-b border-black/5">
+          <h3 className="text-lg font-serif text-[#1a1a1a]">
+            Lịch sử đặt bàn ({bookings.length})
+          </h3>
+          <p className="text-sm text-[#8b857a] mt-1">
+            Các booking của bạn tại Lang Sake
+          </p>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-[#f8f6f4] text-xs uppercase tracking-wider">
+              <tr>
+                <th className="px-6 py-4 text-left text-[#8b857a]">ID</th>
+                <th className="px-6 py-4 text-left text-[#8b857a]">Combo</th>
+                <th className="px-6 py-4 text-left text-[#8b857a]">Thời gian</th>
+                <th className="px-6 py-4 text-left text-[#8b857a]">Số người</th>
+                <th className="px-6 py-4 text-left text-[#8b857a]">Giá trị</th>
+                <th className="px-6 py-4 text-left text-[#8b857a]">Giảm giá</th>
+                <th className="px-6 py-4 text-left text-[#8b857a]">Trạng thái</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-black/5">
+              {bookings.map((booking) => (
+                <tr
+                  key={booking.id}
+                  className="hover:bg-[#f8f6f4]/50 transition-colors"
+                >
+                  <td className="px-6 py-4 text-sm font-mono text-[#8b857a]">
+                    {booking.id.slice(0, 8)}
+                  </td>
+                  <td className="px-6 py-4 text-sm text-[#1a1a1a]">
+                    {booking.comboName}
+                  </td>
+                  <td className="px-6 py-4 text-xs text-[#8b857a]">
+                    {formatDateTime(booking.dateTime)}
+                  </td>
+                  <td className="px-6 py-4 text-sm text-[#1a1a1a]">
+                    {booking.guests}
+                  </td>
+                  <td className="px-6 py-4 text-sm font-medium text-[#1a1a1a]">
+                    {formatCurrency(booking.finalTotal)}
+                  </td>
+                  <td className="px-6 py-4">
+                    {booking.discount > 0 ? (
+                      <span className="text-sm font-medium text-green-600">
+                        -{formatCurrency(booking.discount)}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-[#8b857a]">-</span>
+                    )}
+                  </td>
+                  <td className="px-6 py-4">
+                    <span
+                      className={`text-xs px-3 py-1 rounded-full ${getStatusColor(
+                        booking.status
+                      )}`}
+                    >
+                      {booking.status}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {bookings.length === 0 && (
+          <div className="p-12 text-center">
+            <p className="text-[#8b857a]">Bạn chưa có booking nào</p>
+            <p className="text-xs text-[#8b857a] mt-2">
+              Đặt bàn ngay để tận hưởng ưu đãi thành viên
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 import { useEffect, useMemo, useState } from "react";
 import QRCode from "qrcode";
 import { motion } from "framer-motion";

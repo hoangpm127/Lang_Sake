@@ -1,103 +1,275 @@
-﻿const revenuePoints = [20, 35, 50, 45, 70, 90, 120, 110, 140, 160, 190, 220];
+﻿"use client";
 
-const hierarchy = [
-  {
-    id: "f1-01",
-    name: "Ngọc Trâm",
-    region: "Hà Nội",
-    f2Count: 12,
-    revenue: "1.2B",
-    status: "Active",
-    team: [
-      { name: "Phúc H", bookings: 32, revenue: "220M", status: "Active" },
-      { name: "Linh P", bookings: 28, revenue: "180M", status: "Active" },
-      { name: "Trang K", bookings: 19, revenue: "140M", status: "Pending" },
-    ],
-  },
-  {
-    id: "f1-02",
-    name: "Hải Dương",
-    region: "Hải Phòng",
-    f2Count: 9,
-    revenue: "860M",
-    status: "Active",
-    team: [
-      { name: "Minh T", bookings: 20, revenue: "120M", status: "Active" },
-      { name: "Thảo N", bookings: 16, revenue: "96M", status: "Active" },
-    ],
-  },
-  {
-    id: "f1-03",
-    name: "Gia Hân",
-    region: "Hưng Yên",
-    f2Count: 7,
-    revenue: "640M",
-    status: "Review",
-    team: [
-      { name: "Kiên L", bookings: 12, revenue: "60M", status: "Active" },
-      { name: "Huyền M", bookings: 9, revenue: "45M", status: "Inactive" },
-    ],
-  },
-];
+import { useEffect, useState } from "react";
 
-const bookings = [
-  {
-    id: "BK-1024",
-    guest: "Nguyễn Thảo",
-    combo: "Combo Gia Đình",
-    guests: 6,
-    status: "Deposited",
-    value: "2.4M",
-  },
-  {
-    id: "BK-1025",
-    guest: "Hoàng Duy",
-    combo: "Combo Cặp Đôi",
-    guests: 2,
-    status: "Paid",
-    value: "666K",
-  },
-  {
-    id: "BK-1026",
-    guest: "Mai Linh",
-    combo: "Combo Sinh Viên",
-    guests: 4,
-    status: "Cancelled",
-    value: "396K",
-  },
-];
+type Booking = {
+  id: string;
+  customerName: string;
+  phone: string;
+  email?: string;
+  dateTime: string;
+  guests: number;
+  comboName: string;
+  finalTotal: number;
+  status: string;
+  source: string;
+  customer?: {
+    id: string;
+    name: string;
+    email: string;
+    role: string;
+  };
+  createdBy?: {
+    id: string;
+    name: string;
+    email: string;
+    role: string;
+  };
+};
 
 export default function AdminDashboard() {
-  const chartWidth = 520;
-  const chartHeight = 140;
-  const maxValue = Math.max(...revenuePoints);
-  const chartPath = revenuePoints
-    .map((point, index) => {
-      const x = (index / (revenuePoints.length - 1)) * chartWidth;
-      const y = chartHeight - (point / maxValue) * chartHeight;
-      return `${index === 0 ? "M" : "L"}${x.toFixed(1)} ${y.toFixed(1)}`;
-    })
-    .join(" ");
+  const [bookings, setBookings] = useState<Booking[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchBookings();
+  }, []);
+
+  const fetchBookings = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch("/api/bookings");
+      const data = await response.json();
+
+      if (data.ok) {
+        setBookings(data.bookings);
+      } else {
+        setError(data.message);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Lỗi tải dữ liệu");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "CONFIRMED":
+        return "bg-green-100 text-green-800";
+      case "PENDING":
+        return "bg-yellow-100 text-yellow-800";
+      case "COMPLETED":
+        return "bg-blue-100 text-blue-800";
+      case "CANCELLED":
+        return "bg-red-100 text-red-800";
+      default:
+        return "bg-gray-100 text-gray-800";
+    }
+  };
+
+  const getSourceLabel = (source: string) => {
+    switch (source) {
+      case "WEB_DIRECT":
+        return "Web";
+      case "ADMIN_CREATE":
+        return "Admin";
+      case "F1_CREATE":
+        return "F1 Partner";
+      case "F2_SELF":
+        return "F2 Member";
+      default:
+        return source;
+    }
+  };
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat("vi-VN", {
+      style: "currency",
+      currency: "VND",
+    }).format(amount);
+  };
+
+  const formatDateTime = (dateTime: string) => {
+    return new Date(dateTime).toLocaleString("vi-VN", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  // Tính toán thống kê
+  const totalRevenue = bookings
+    .filter((b) => b.status !== "CANCELLED")
+    .reduce((sum, b) => sum + b.finalTotal, 0);
+
+  const confirmedBookings = bookings.filter((b) => b.status === "CONFIRMED").length;
+  const pendingBookings = bookings.filter((b) => b.status === "PENDING").length;
+
+  const sourceStats = bookings.reduce((acc, booking) => {
+    acc[booking.source] = (acc[booking.source] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-[#c9a24d] border-r-transparent"></div>
+          <p className="mt-4 text-sm text-[#8b857a]">Đang tải...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="rounded-3xl border border-red-200 bg-red-50 p-6">
+        <p className="text-red-800">❌ {error}</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-12">
-      <div className="grid gap-6 lg:grid-cols-3">
+    <div className="space-y-8">
+      {/* Statistics Cards */}
+      <div className="grid gap-6 lg:grid-cols-4">
         <div className="rounded-3xl border border-black/5 bg-white p-6 shadow-sm">
           <p className="text-xs uppercase tracking-[0.2em] text-[#8b857a]">
-            Total Revenue
+            Tổng doanh thu
           </p>
-          <p className="mt-4 font-serif text-3xl text-[#1a1a1a]">32.6B</p>
-          <p className="mt-2 text-xs text-[#8b857a]">+12% so với tháng trước</p>
-          <svg
-            className="mt-6 w-full"
-            viewBox={`0 0 ${chartWidth} ${chartHeight}`}
-            fill="none"
-          >
-            <path d={chartPath} stroke="#c9a24d" strokeWidth="3" />
-            <path
-              d={`${chartPath} L ${chartWidth} ${chartHeight} L 0 ${chartHeight} Z`}
-              fill="url(#goldFade)"
-              opacity="0.2"
+          <p className="mt-4 font-serif text-3xl text-[#1a1a1a]">
+            {formatCurrency(totalRevenue)}
+          </p>
+        </div>
+
+        <div className="rounded-3xl border border-black/5 bg-white p-6 shadow-sm">
+          <p className="text-xs uppercase tracking-[0.2em] text-[#8b857a]">
+            Đã xác nhận
+          </p>
+          <p className="mt-4 font-serif text-3xl text-green-600">
+            {confirmedBookings}
+          </p>
+        </div>
+
+        <div className="rounded-3xl border border-black/5 bg-white p-6 shadow-sm">
+          <p className="text-xs uppercase tracking-[0.2em] text-[#8b857a]">
+            Chờ xác nhận
+          </p>
+          <p className="mt-4 font-serif text-3xl text-yellow-600">
+            {pendingBookings}
+          </p>
+        </div>
+
+        <div className="rounded-3xl border border-black/5 bg-white p-6 shadow-sm">
+          <p className="text-xs uppercase tracking-[0.2em] text-[#8b857a]">
+            Tổng bookings
+          </p>
+          <p className="mt-4 font-serif text-3xl text-[#1a1a1a]">
+            {bookings.length}
+          </p>
+        </div>
+      </div>
+
+      {/* Source Statistics */}
+      <div className="rounded-3xl border border-black/5 bg-white p-6 shadow-sm">
+        <h3 className="text-lg font-serif text-[#1a1a1a] mb-4">Nguồn Booking</h3>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {Object.entries(sourceStats).map(([source, count]) => (
+            <div key={source} className="border-l-4 border-[#c9a24d] pl-4">
+              <p className="text-xs text-[#8b857a]">{getSourceLabel(source)}</p>
+              <p className="text-2xl font-serif text-[#1a1a1a]">{count}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Bookings Table */}
+      <div className="rounded-3xl border border-black/5 bg-white shadow-sm overflow-hidden">
+        <div className="p-6 border-b border-black/5">
+          <h3 className="text-lg font-serif text-[#1a1a1a]">
+            Tất cả Bookings ({bookings.length})
+          </h3>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-[#f8f6f4] text-xs uppercase tracking-wider">
+              <tr>
+                <th className="px-6 py-4 text-left text-[#8b857a]">ID</th>
+                <th className="px-6 py-4 text-left text-[#8b857a]">Khách hàng</th>
+                <th className="px-6 py-4 text-left text-[#8b857a]">Combo</th>
+                <th className="px-6 py-4 text-left text-[#8b857a]">Thời gian</th>
+                <th className="px-6 py-4 text-left text-[#8b857a]">Số người</th>
+                <th className="px-6 py-4 text-left text-[#8b857a]">Nguồn</th>
+                <th className="px-6 py-4 text-left text-[#8b857a]">Tạo bởi</th>
+                <th className="px-6 py-4 text-left text-[#8b857a]">Giá trị</th>
+                <th className="px-6 py-4 text-left text-[#8b857a]">Trạng thái</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-black/5">
+              {bookings.map((booking) => (
+                <tr key={booking.id} className="hover:bg-[#f8f6f4]/50 transition-colors">
+                  <td className="px-6 py-4 text-sm font-mono text-[#8b857a]">
+                    {booking.id.slice(0, 8)}
+                  </td>
+                  <td className="px-6 py-4">
+                    <p className="text-sm font-medium text-[#1a1a1a]">
+                      {booking.customerName}
+                    </p>
+                    <p className="text-xs text-[#8b857a]">{booking.phone}</p>
+                    {booking.email && (
+                      <p className="text-xs text-[#8b857a]">{booking.email}</p>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 text-sm text-[#1a1a1a]">
+                    {booking.comboName}
+                  </td>
+                  <td className="px-6 py-4 text-xs text-[#8b857a]">
+                    {formatDateTime(booking.dateTime)}
+                  </td>
+                  <td className="px-6 py-4 text-sm text-[#1a1a1a]">
+                    {booking.guests}
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-800">
+                      {getSourceLabel(booking.source)}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-xs text-[#8b857a]">
+                    {booking.createdBy ? booking.createdBy.name : "-"}
+                  </td>
+                  <td className="px-6 py-4 text-sm font-medium text-[#c9a24d]">
+                    {formatCurrency(booking.finalTotal)}
+                  </td>
+                  <td className="px-6 py-4">
+                    <span
+                      className={`text-xs px-3 py-1 rounded-full ${getStatusColor(
+                        booking.status
+                      )}`}
+                    >
+                      {booking.status}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {bookings.length === 0 && (
+          <div className="p-12 text-center">
+            <p className="text-[#8b857a]">Chưa có booking nào</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
             />
             <defs>
               <linearGradient id="goldFade" x1="0" y1="0" x2="0" y2="1">

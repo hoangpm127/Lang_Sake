@@ -5,60 +5,234 @@ import { prisma } from "@/lib/db";
 type BookingPayload = {
   customerName?: string;
   phone?: string;
+  email?: string;
   dateTime?: string;
   guests?: number;
   comboName?: string;
   comboPrice?: number;
   hasDeposit?: boolean;
+  referralCode?: string; // Mã giới thiệu (optional)
+  notes?: string;
 };
 
-export async function POST(request: Request) {
-  const role = cookies().get("sake_role")?.value;
-  if (role !== "f2") {
-    return NextResponse.json(
-      { ok: false, message: "Không có quyền tạo booking." },
-      { status: 403 }
-    );
-  }
+// Helper: Tính discount dựa trên referral code
+async function calculateDiscount(
+  referralCode: string | undefined,
+  subtotal: number
+) {
+  if (!referralCode) return { discount: 0, discountReason: null };
 
-  const payload = (await request.json()) as BookingPayload;
-
-  const customerName = (payload.customerName ?? "").trim();
-  const phone = (payload.phone ?? "").trim();
-  const dateTimeValue = payload.dateTime ? new Date(payload.dateTime) : null;
-  const guests = Math.max(1, Number(payload.guests ?? 1));
-  const comboName = (payload.comboName ?? "").trim();
-  const comboPrice = Math.max(0, Number(payload.comboPrice ?? 0));
-  const hasDeposit = Boolean(payload.hasDeposit);
-
-  if (!customerName || !phone || !dateTimeValue || !comboName || !comboPrice) {
-    return NextResponse.json(
-      { ok: false, message: "Thiếu thông tin đặt lịch." },
-      { status: 400 }
-    );
-  }
-
-  const subtotal = Math.round(guests * comboPrice);
-  const discount = hasDeposit ? Math.round(subtotal * 0.1) : 0;
-  const finalTotal = subtotal - discount;
-  const depositAmount = hasDeposit ? Math.round(finalTotal * 0.1) : 0;
-
-  const booking = await prisma.booking.create({
-    data: {
-      customerName,
-      phone,
-      dateTime: dateTimeValue,
-      guests,
-      comboName,
-      comboPrice,
-      hasDeposit,
-      subtotal,
-      discount,
-      finalTotal,
-      depositAmount,
-      status: hasDeposit ? "deposit" : "pending",
-    },
+  // Tìm user có mã giới thiệu này
+  const referrer = await prisma.user.findUnique({
+    where: { referralCode },
   });
 
-  return NextResponse.json({ ok: true, booking });
+  if (!referrer || !referrer.isActive) {
+    return { discount: 0, discountReason: null };
+  }
+
+  // F2 Member có discount
+  if (referrer.role === "F2_MEMBER" && referrer.discountRate) {
+    const discount = Math.round(subtotal * (referrer.discountRate / 100));
+    return { discount, discountReason: "F2_MEMBER" };
+  }
+
+  return { discount: 0, discountReason: null };
+}
+
+export async function POST(request: Request) {
+  try {
+    const roleFromCookie = cookies().get("sake_role")?.value;
+    const userIdFromCookie = cookies().get("sake_user_id")?.value;
+
+    const payload = (await request.json()) as BookingPayload;
+
+    const customerName = (payload.customerName ?? "").trim();
+    const phone = (payload.phone ?? "").trim();
+    const email = (payload.email ?? "").trim() || undefined;
+    const dateTimeValue = payload.dateTime ? new Date(payload.dateTime) : null;
+    const guests = Math.max(1, Number(payload.guests ?? 1));
+    const comboName = (payload.comboName ?? "").trim();
+    const comboPrice = Math.max(0, Number(payload.comboPrice ?? 0));
+    const hasDeposit = Boolean(payload.hasDeposit);
+    const referralCode = (payload.referralCode ?? "").trim() || undefined;
+    const notes = (payload.notes ?? "").trim() || undefined;
+
+    if (
+      !customerName ||
+      !phone ||
+      !dateTimeValue ||
+      !comboName ||
+      !comboPrice
+    ) {
+      return NextResponse.json(
+        { ok: false, message: "Thiếu thông tin đặt lịch." },
+        { status: 400 }
+      );
+    }
+
+    const subtotal = Math.round(comboPrice * guests);
+
+    // Tính discount nếu có referral code
+    const { discount, discountReason } = await calculateDiscount(
+      referralCode,
+      subtotal
+    );
+
+    const finalTotal = subtotal - discount;
+    const depositAmount = hasDeposit ? Math.round(finalTotal * 0.2) : 0;
+
+    // Xác định source và creator
+    let source = "WEB_DIRECT";
+    let createdById: string | undefined = undefined;
+    let customerId: string | undefined = undefined;
+
+    if (roleFromCookie === "admin") {
+      source = "ADMIN_CREATE";
+      createdById = userIdFromCookie;
+    } else if (roleFromCookie === "f1") {
+      source = "F1_CREATE";
+      createdById = userIdFromCookie;
+    } else if (roleFromCookie === "f2") {
+      source = "F2_SELF";
+      customerId = userIdFromCookie;
+    } else if (roleFromCookie === "customer") {
+      customerId = userIdFromCookie;
+    }
+
+    // Tạo booking
+    const booking = await prisma.booking.create({
+      data: {
+        customerId,
+        customerName,
+        phone,
+        email,
+        dateTime: dateTimeValue,
+        guests,
+        comboName,
+        comboPrice,
+        hasDeposit,
+        subtotal,
+        discount,
+        discountReason,
+        finalTotal,
+        depositAmount,
+        source,
+        status: "PENDING",
+        createdById,
+        referralCode,
+        notes,
+      },
+    });
+
+    // Nếu là F1 tạo booking, tính hoa hồng
+    if (source === "F1_CREATE" && createdById) {
+      const f1Partner = await prisma.user.findUnique({
+        where: { id: createdById },
+      });
+
+      if (f1Partner && f1Partner.commissionRate) {
+        const commissionAmount = Math.round(
+          finalTotal * (f1Partner.commissionRate / 100)
+        );
+
+        await prisma.commission.create({
+          data: {
+            partnerId: createdById,
+            bookingId: booking.id,
+            amount: commissionAmount,
+            rate: f1Partner.commissionRate,
+            isPaid: false,
+          },
+        });
+
+        // Update total commission
+        await prisma.user.update({
+          where: { id: createdById },
+          data: {
+            totalCommission: {
+              increment: commissionAmount,
+            },
+          },
+        });
+      }
+    }
+
+    return NextResponse.json({ ok: true, booking });
+  } catch (error) {
+    console.error("Booking error:", error);
+    return NextResponse.json(
+      {
+        ok: false,
+        message:
+          error instanceof Error ? error.message : "Lỗi tạo booking.",
+      },
+      { status: 500 }
+    );
+  }
+}
+
+// GET: Lấy danh sách bookings theo role
+export async function GET(request: Request) {
+  try {
+    const roleFromCookie = cookies().get("sake_role")?.value;
+    const userIdFromCookie = cookies().get("sake_user_id")?.value;
+
+    if (!roleFromCookie || !userIdFromCookie) {
+      return NextResponse.json(
+        { ok: false, message: "Unauthorized" },
+        { status: 401 }
+      );
+    }
+
+    let bookings;
+
+    if (roleFromCookie === "admin") {
+      // Admin xem tất cả bookings
+      bookings = await prisma.booking.findMany({
+        include: {
+          customer: {
+            select: { id: true, name: true, email: true, phone: true, role: true },
+          },
+          createdBy: {
+            select: { id: true, name: true, email: true, role: true },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+      });
+    } else if (roleFromCookie === "f1") {
+      // F1 chỉ xem bookings do mình tạo
+      bookings = await prisma.booking.findMany({
+        where: { createdById: userIdFromCookie },
+        include: {
+          customer: {
+            select: { id: true, name: true, email: true, phone: true },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+      });
+    } else if (roleFromCookie === "f2" || roleFromCookie === "customer") {
+      // F2/Customer chỉ xem bookings của chính mình
+      bookings = await prisma.booking.findMany({
+        where: { customerId: userIdFromCookie },
+        orderBy: { createdAt: "desc" },
+      });
+    } else {
+      return NextResponse.json(
+        { ok: false, message: "Forbidden" },
+        { status: 403 }
+      );
+    }
+
+    return NextResponse.json({ ok: true, bookings });
+  } catch (error) {
+    console.error("Get bookings error:", error);
+    return NextResponse.json(
+      {
+        ok: false,
+        message: error instanceof Error ? error.message : "Lỗi lấy bookings.",
+      },
+      { status: 500 }
+    );
+  }
 }

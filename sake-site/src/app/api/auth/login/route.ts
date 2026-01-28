@@ -1,97 +1,103 @@
 ﻿import { NextResponse } from "next/server";
+import { prisma } from "@/lib/db";
 
 type LoginPayload = {
-  role?: "admin" | "f1" | "f2";
-  identifier?: string;
+  email?: string;
   password?: string;
-  otp?: string;
 };
 
 const normalize = (value: string | undefined) => (value ?? "").trim();
 
-const parseAccounts = (raw: string) =>
-  raw
-    .split(";")
-    .map((entry) => entry.trim())
-    .filter(Boolean)
-    .map((entry) => {
-      const [identifier, password] = entry.split(":");
-      return {
-        identifier: (identifier ?? "").trim(),
-        password: (password ?? "").trim(),
-      };
-    });
-
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as LoginPayload;
-    const role = body.role;
-    const identifier = normalize(body.identifier);
+    const email = normalize(body.email);
     const password = normalize(body.password);
-    const otp = normalize(body.otp);
 
-    if (!role || !identifier || !password) {
+    if (!email || !password) {
       return NextResponse.json(
         { ok: false, message: "Thiếu thông tin đăng nhập." },
         { status: 400 }
       );
     }
 
-    let isValid = false;
+    // Tìm user theo email
+    const user = await prisma.user.findUnique({
+      where: { email: email.toLowerCase() },
+    });
 
-    if (role === "admin") {
-      const adminId = normalize(process.env.ADMIN_ID) || "admin";
-      const adminPassword = normalize(process.env.ADMIN_PASSWORD) || "admin123";
-      const adminOtp = normalize(process.env.ADMIN_OTP);
-
-      isValid =
-        identifier.toLowerCase() === adminId.toLowerCase() &&
-        password === adminPassword &&
-        (!adminOtp || !otp || otp === adminOtp);
-    }
-
-    if (role === "f1") {
-      const accounts = parseAccounts(
-        process.env.F1_ACCOUNTS || "f1@langsake.vn:welcome123"
-      );
-      isValid = accounts.some(
-        (account) =>
-          account.identifier.toLowerCase() === identifier.toLowerCase() &&
-          account.password === password
-      );
-    }
-
-    if (role === "f2") {
-      const accounts = parseAccounts(
-        process.env.F2_ACCOUNTS || "0900000000:welcome123"
-      );
-      isValid = accounts.some(
-        (account) =>
-          account.identifier.toLowerCase() === identifier.toLowerCase() &&
-          account.password === password
-      );
-    }
-
-    if (!isValid) {
+    if (!user) {
       return NextResponse.json(
-        { ok: false, message: "Thông tin đăng nhập không chính xác." },
+        { ok: false, message: "Email không tồn tại." },
         { status: 401 }
       );
     }
 
+    // Kiểm tra active
+    if (!user.isActive) {
+      return NextResponse.json(
+        { ok: false, message: "Tài khoản đã bị vô hiệu hóa." },
+        { status: 403 }
+      );
+    }
+
+    // TODO: Implement password hashing (bcrypt) sau
+    // Tạm thời so sánh plain text
+    if (user.password !== password) {
+      return NextResponse.json(
+        { ok: false, message: "Mật khẩu không chính xác." },
+        { status: 401 }
+      );
+    }
+
+    // Map role to route
+    let roleRoute = "customer";
+    switch (user.role) {
+      case "ADMIN":
+        roleRoute = "admin";
+        break;
+      case "F1_PARTNER":
+        roleRoute = "f1";
+        break;
+      case "F2_MEMBER":
+        roleRoute = "f2";
+        break;
+      case "CUSTOMER":
+        roleRoute = "customer";
+        break;
+    }
+
     const response = NextResponse.json({
       ok: true,
-      role,
-      redirect: `/dashboard/${role}`,
+      role: roleRoute,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        referralCode: user.referralCode,
+      },
+      redirect: `/dashboard/${roleRoute}`,
     });
-    response.cookies.set("sake_role", role, {
+
+    // Set cookies
+    response.cookies.set("sake_role", roleRoute, {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+      maxAge: 60 * 60 * 8, // 8 hours
+    });
+
+    response.cookies.set("sake_user_id", user.id, {
       httpOnly: true,
       sameSite: "lax",
       secure: process.env.NODE_ENV === "production",
       path: "/",
       maxAge: 60 * 60 * 8,
     });
-    response.cookies.set("sake_user", identifier, {
+
+    response.cookies.set("sake_user_email", user.email, {
       httpOnly: true,
       sameSite: "lax",
       secure: process.env.NODE_ENV === "production",
@@ -101,6 +107,7 @@ export async function POST(request: Request) {
 
     return response;
   } catch (error) {
+    console.error("Login error:", error);
     return NextResponse.json(
       {
         ok: false,

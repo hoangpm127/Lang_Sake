@@ -69,19 +69,15 @@ const ROLE_CONFIG: RoleConfig[] = [
 
 const ROLE_FIELDS: Record<Role, RoleField[]> = {
   admin: [
-    { id: "adminId", label: "Mã quản trị" },
+    { id: "email", label: "Email" },
     { id: "password", label: "Mật khẩu", type: "password" },
-    { id: "otp", label: "Mã 2FA (tuỳ chọn)" },
   ],
   f1: [
-    {
-      id: "contact",
-      label: "Email hoặc số điện thoại",
-    },
+    { id: "email", label: "Email" },
     { id: "password", label: "Mật khẩu", type: "password" },
   ],
   f2: [
-    { id: "phone", label: "Số điện thoại" },
+    { id: "email", label: "Email" },
     { id: "password", label: "Mật khẩu", type: "password" },
   ],
 };
@@ -136,16 +132,14 @@ export default function LoginPage() {
     setIsSubmitting(true);
     setError(null);
 
-    const [primaryField] = ROLE_FIELDS[role];
-    const identifier = formState[primaryField.id] ?? "";
+    const email = formState.email ?? "";
     const password = formState.password ?? "";
-    const otp = formState.otp ?? "";
 
     try {
       const response = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role, identifier, password, otp }),
+        body: JSON.stringify({ email, password }),
       });
 
       const text = await response.text();

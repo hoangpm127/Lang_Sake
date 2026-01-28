@@ -7,19 +7,131 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// Vai trò người dùng
+enum UserRole {
+  ADMIN              // Quản trị viên - toàn quyền
+  F1_PARTNER         // Đối tác chiến lược - có mã giới thiệu, hoa hồng
+  F2_MEMBER          // Thành viên - có ưu đãi, discount
+  CUSTOMER           // Khách hàng thường
+}
+
+// Nguồn booking
+enum BookingSource {
+  WEB_DIRECT         // Khách đặt trực tiếp trên web
+  ADMIN_CREATE       // Admin tạo cho khách (walk-in)
+  F1_CREATE          // F1 tạo cho khách của mình
+  F2_SELF            // F2 tự đặt cho mình
+}
+
+// Trạng thái booking
+enum BookingStatus {
+  PENDING            // Chờ xác nhận
+  CONFIRMED          // Đã xác nhận
+  COMPLETED          // Đã hoàn thành
+  CANCELLED          // Đã hủy
+  NO_SHOW            // Không đến
+}
+
+// Người dùng
+model User {
+  id              String   @id @default(cuid())
+  email           String   @unique
+  phone           String?
+  password        String   // Hashed password
+  name            String
+  role            UserRole @default(CUSTOMER)
+  
+  // Mã giới thiệu (cho F1, F2)
+  referralCode    String?  @unique
+  
+  // Người giới thiệu (nếu có)
+  referredById    String?
+  referredBy      User?    @relation("Referrals", fields: [referredById], references: [id])
+  referrals       User[]   @relation("Referrals")
+  
+  // Thông tin F1
+  commissionRate  Float?   // % hoa hồng (cho F1)
+  totalCommission Float    @default(0)
+  
+  // Thông tin F2
+  discountRate    Float?   // % discount (cho F2)
+  membershipLevel String?  // VIP, Gold, Silver...
+  
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relations
+  bookingsAsCustomer Booking[] @relation("CustomerBookings")
+  bookingsAsCreator  Booking[] @relation("CreatorBookings")
+  commissions        Commission[]
+}
+
+// Đặt bàn
 model Booking {
-  id            String   @id @default(cuid())
-  customerName  String
-  phone         String
-  dateTime      DateTime
-  guests        Int
-  comboName     String
-  comboPrice    Int
-  hasDeposit    Boolean
-  subtotal      Int
-  discount      Int
-  finalTotal    Int
-  depositAmount Int
-  status        String   @default("pending")
-  createdAt     DateTime @default(now())
+  id              String        @id @default(cuid())
+  
+  // Thông tin khách hàng
+  customerId      String?
+  customer        User?         @relation("CustomerBookings", fields: [customerId], references: [id])
+  customerName    String        // Backup nếu không có account
+  phone           String
+  email           String?
+  
+  // Thông tin booking
+  dateTime        DateTime
+  guests          Int
+  comboName       String
+  comboPrice      Int
+  
+  // Tài chính
+  subtotal        Int
+  discount        Int           @default(0)
+  discountReason  String?       // "F2_MEMBER", "PROMO_CODE", etc
+  finalTotal      Int
+  
+  // Đặt cọc
+  hasDeposit      Boolean       @default(false)
+  depositAmount   Int           @default(0)
+  depositPaid     Boolean       @default(false)
+  
+  // Tracking
+  source          BookingSource @default(WEB_DIRECT)
+  status          BookingStatus @default(PENDING)
+  
+  // Người tạo booking (admin hoặc F1 tạo hộ)
+  createdById     String?
+  createdBy       User?         @relation("CreatorBookings", fields: [createdById], references: [id])
+  
+  // Mã giới thiệu sử dụng
+  referralCode    String?
+  
+  // Ghi chú
+  notes           String?
+  internalNotes   String?       // Chỉ admin/staff thấy
+  
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  
+  // Relations
+  commissions     Commission[]
+}
+
+// Hoa hồng (cho F1)
+model Commission {
+  id              String   @id @default(cuid())
+  
+  partnerId       String
+  partner         User     @relation(fields: [partnerId], references: [id])
+  
+  bookingId       String
+  booking         Booking  @relation(fields: [bookingId], references: [id])
+  
+  amount          Float    // Số tiền hoa hồng
+  rate            Float    // % hoa hồng tại thời điểm tính
+  
+  isPaid          Boolean  @default(false)
+  paidAt          DateTime?
+  
+  createdAt       DateTime @default(now())
 }
