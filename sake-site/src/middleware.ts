@@ -15,6 +15,8 @@ export function middleware(request: NextRequest) {
   }
 
   const roleCookie = request.cookies.get("sake_role")?.value;
+  console.log(`[Middleware] Path: ${pathname}, Role Cookie: ${roleCookie}`);
+  
   if (!roleCookie) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
@@ -32,7 +34,10 @@ export function middleware(request: NextRequest) {
     pathname.startsWith(prefix)
   )?.[1];
 
+  console.log(`[Middleware] Required Role: ${requiredRole}, User Role: ${roleCookie}`);
+
   if (requiredRole && roleCookie !== requiredRole) {
+    console.log(`[Middleware] FORBIDDEN: Required ${requiredRole}, got ${roleCookie}`);
     const url = request.nextUrl.clone();
     url.pathname = `/dashboard/${roleCookie}`;
     url.searchParams.set("error", "forbidden");

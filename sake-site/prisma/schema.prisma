@@ -18,8 +18,6 @@ enum UserRole {
 // Nguồn booking
 enum BookingSource {
   WEB_DIRECT         // Khách đặt trực tiếp trên web
-  ADMIN_CREATE       // Admin tạo cho khách (walk-in)
-  F1_CREATE          // F1 tạo cho khách của mình
   F2_SELF            // F2 tự đặt cho mình
 }
 

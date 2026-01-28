@@ -22,6 +22,7 @@ const { affiliate } = siteContent;
 type AffiliateFormValues = {
   fullName: string;
   phone: string;
+  email: string;
   password: string;
   socialLink: string;
   referralCode?: string;
@@ -147,6 +148,7 @@ export default function AffiliateHub() {
   const referralParam = searchParams.get("ref")?.trim();
   const [revenue, setRevenue] = useState(affiliate.calculator.defaultValue);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
 
   const {
     register,
@@ -323,9 +325,31 @@ export default function AffiliateHub() {
               <CardContent>
                 <form
                   className="space-y-5"
-                  onSubmit={handleSubmit(async () => {
-                    await new Promise((resolve) => setTimeout(resolve, 500));
-                    setShowSuccess(true);
+                  onSubmit={handleSubmit(async (data) => {
+                    try {
+                      setErrorMessage("");
+                      const response = await fetch("/api/auth/register", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          name: data.fullName,
+                          email: data.email,
+                          phone: data.phone,
+                          password: data.password,
+                          referralCode: data.referralCode,
+                        }),
+                      });
+
+                      const result = await response.json();
+                      
+                      if (!response.ok || !result.ok) {
+                        throw new Error(result.message || "Đăng ký thất bại");
+                      }
+
+                      setShowSuccess(true);
+                    } catch (err) {
+                      setErrorMessage(err instanceof Error ? err.message : "Đăng ký thất bại");
+                    }
                   })}
                 >
                   <div className="space-y-2">
@@ -363,6 +387,26 @@ export default function AffiliateHub() {
                     ) : null}
                   </div>
                   <div className="space-y-2">
+                    <Label htmlFor="email">Email</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="email@example.com"
+                      {...register("email", {
+                        required: "Vui lòng nhập email.",
+                        pattern: {
+                          value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
+                          message: "Email không hợp lệ.",
+                        },
+                      })}
+                    />
+                    {errors.email ? (
+                      <p className="text-xs text-ember">
+                        {errors.email.message}
+                      </p>
+                    ) : null}
+                  </div>
+                  <div className="space-y-2">
                     <Label htmlFor="password">Mật khẩu</Label>
                     <Input
                       id="password"
@@ -383,35 +427,28 @@ export default function AffiliateHub() {
                     ) : null}
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="socialLink">Link TikTok/Facebook</Label>
-                    <Input
-                      id="socialLink"
-                      placeholder="Dán link trang cá nhân của bạn..."
-                      {...register("socialLink", {
-                        required: "Vui lòng dán link trang cá nhân.",
-                      })}
-                    />
-                    {errors.socialLink ? (
-                      <p className="text-xs text-ember">
-                        {errors.socialLink.message}
-                      </p>
-                    ) : null}
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="referralCode">Mã người giới thiệu (F1)</Label>
+                    <Label htmlFor="referralCode">Mã người giới thiệu</Label>
                     <Input
                       id="referralCode"
-                      placeholder="Ví dụ: F1-TRAM2026"
+                      placeholder="Nhập mã giới thiệu (nếu có)"
                       disabled={Boolean(referralParam)}
                       {...register("referralCode")}
                     />
+                    <p className="text-xs text-muted-foreground">
+                      Nhập mã F2 hoặc F1 để nhận ưu đãi giảm giá
+                    </p>
                   </div>
+                  {errorMessage && (
+                    <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-800">
+                      {errorMessage}
+                    </div>
+                  )}
                   <Button
                     className="w-full bg-gradient-to-r from-zen via-amber-200 to-amber-400 text-[#1a1a1a] shadow-lg"
                     type="submit"
                     disabled={isSubmitting}
                   >
-                    {isSubmitting ? "Đang đăng ký..." : "Đăng Ký Ngay"}
+                    {isSubmitting ? "Đang đăng ký..." : "Đăng Ký Thành Viên F2"}
                   </Button>
                   <p className="text-center text-xs text-muted-foreground">
                     Đã có tài khoản?{" "}

@@ -67,6 +67,8 @@ export async function POST(request: Request) {
         break;
     }
 
+    console.log(`[Login] User: ${user.email}, DB Role: ${user.role}, Cookie Role: ${roleRoute}`);
+
     const response = NextResponse.json({
       ok: true,
       role: roleRoute,

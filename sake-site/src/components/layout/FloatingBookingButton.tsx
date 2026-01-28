@@ -2,11 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { siteContent } from "@/content/data";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-
-const { bookingCta } = siteContent;
 
 export default function FloatingBookingButton() {
   const [avoidFooter, setAvoidFooter] = useState(false);
@@ -37,11 +35,9 @@ export default function FloatingBookingButton() {
       <Button
         asChild
         size="lg"
-        className="shadow-[0_20px_50px_rgba(230,57,70,0.35)]"
+        className="shadow-[0_20px_50px_rgba(201,162,77,0.35)]"
       >
-        <a href={bookingCta.href} target="_blank" rel="noopener noreferrer">
-          {bookingCta.label}
-        </a>
+        <Link href="/booking">Đặt bàn ngay</Link>
       </Button>
     </motion.div>
   );

@@ -42,8 +42,9 @@ async function calculateDiscount(
 
 export async function POST(request: Request) {
   try {
-    const roleFromCookie = cookies().get("sake_role")?.value;
-    const userIdFromCookie = cookies().get("sake_user_id")?.value;
+    const cookieStore = await cookies();
+    const roleFromCookie = cookieStore.get("sake_role")?.value;
+    const userIdFromCookie = cookieStore.get("sake_user_id")?.value;
 
     const payload = (await request.json()) as BookingPayload;
 
@@ -82,21 +83,13 @@ export async function POST(request: Request) {
     const finalTotal = subtotal - discount;
     const depositAmount = hasDeposit ? Math.round(finalTotal * 0.2) : 0;
 
-    // Xác định source và creator
-    let source = "WEB_DIRECT";
-    let createdById: string | undefined = undefined;
+    // Xác định source và customer
+    let source = "WEB_DIRECT"; // Default cho khách vãng lai
     let customerId: string | undefined = undefined;
 
-    if (roleFromCookie === "admin") {
-      source = "ADMIN_CREATE";
-      createdById = userIdFromCookie;
-    } else if (roleFromCookie === "f1") {
-      source = "F1_CREATE";
-      createdById = userIdFromCookie;
-    } else if (roleFromCookie === "f2") {
+    // Chỉ F2 member mới có source khác
+    if (roleFromCookie === "f2" && userIdFromCookie) {
       source = "F2_SELF";
-      customerId = userIdFromCookie;
-    } else if (roleFromCookie === "customer") {
       customerId = userIdFromCookie;
     }
 
@@ -119,44 +112,10 @@ export async function POST(request: Request) {
         depositAmount,
         source,
         status: "PENDING",
-        createdById,
         referralCode,
         notes,
       },
     });
-
-    // Nếu là F1 tạo booking, tính hoa hồng
-    if (source === "F1_CREATE" && createdById) {
-      const f1Partner = await prisma.user.findUnique({
-        where: { id: createdById },
-      });
-
-      if (f1Partner && f1Partner.commissionRate) {
-        const commissionAmount = Math.round(
-          finalTotal * (f1Partner.commissionRate / 100)
-        );
-
-        await prisma.commission.create({
-          data: {
-            partnerId: createdById,
-            bookingId: booking.id,
-            amount: commissionAmount,
-            rate: f1Partner.commissionRate,
-            isPaid: false,
-          },
-        });
-
-        // Update total commission
-        await prisma.user.update({
-          where: { id: createdById },
-          data: {
-            totalCommission: {
-              increment: commissionAmount,
-            },
-          },
-        });
-      }
-    }
 
     return NextResponse.json({ ok: true, booking });
   } catch (error) {
@@ -175,8 +134,9 @@ export async function POST(request: Request) {
 // GET: Lấy danh sách bookings theo role
 export async function GET(request: Request) {
   try {
-    const roleFromCookie = cookies().get("sake_role")?.value;
-    const userIdFromCookie = cookies().get("sake_user_id")?.value;
+    const cookieStore = await cookies();
+    const roleFromCookie = cookieStore.get("sake_role")?.value;
+    const userIdFromCookie = cookieStore.get("sake_user_id")?.value;
 
     if (!roleFromCookie || !userIdFromCookie) {
       return NextResponse.json(
@@ -188,25 +148,45 @@ export async function GET(request: Request) {
     let bookings;
 
     if (roleFromCookie === "admin") {
-      // Admin xem tất cả bookings
+      // Admin xem tất cả bookings với đầy đủ thông tin F2 -> F1
       bookings = await prisma.booking.findMany({
         include: {
           customer: {
-            select: { id: true, name: true, email: true, phone: true, role: true },
-          },
-          createdBy: {
-            select: { id: true, name: true, email: true, role: true },
+            select: { 
+              id: true, 
+              name: true, 
+              email: true, 
+              phone: true, 
+              role: true,
+              referredBy: {
+                select: { id: true, name: true, referralCode: true, role: true }
+              }
+            },
           },
         },
         orderBy: { createdAt: "desc" },
       });
     } else if (roleFromCookie === "f1") {
-      // F1 chỉ xem bookings do mình tạo
+      // F1 Partner CHỈ xem bookings từ F2 member mình giới thiệu
       bookings = await prisma.booking.findMany({
-        where: { createdById: userIdFromCookie },
+        where: {
+          customer: {
+            role: "F2_MEMBER",
+            referredById: userIdFromCookie, // Chỉ F2 do F1 này giới thiệu
+          },
+        },
         include: {
           customer: {
-            select: { id: true, name: true, email: true, phone: true },
+            select: { 
+              id: true, 
+              name: true, 
+              email: true, 
+              phone: true, 
+              role: true,
+              referredBy: {
+                select: { id: true, name: true, referralCode: true, role: true }
+              }
+            },
           },
         },
         orderBy: { createdAt: "desc" },

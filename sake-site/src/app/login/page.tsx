@@ -151,7 +151,14 @@ export default function LoginPage() {
         throw new Error(payload?.message || "Đăng nhập thất bại.");
       }
 
-      router.push(payload.redirect || `/dashboard/${role}`);
+      // IMPORTANT: Always use redirect from server, not the UI role selection
+      // This prevents users from accessing wrong dashboard by selecting different role tab
+      if (payload.redirect) {
+        router.push(payload.redirect);
+      } else {
+        // Fallback: refresh to let middleware handle redirect
+        window.location.href = "/dashboard";
+      }
     } catch (submitError) {
       setError(
         submitError instanceof Error
