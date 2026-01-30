@@ -110,36 +110,36 @@ export default function TimelinePage() {
   const currentMonth = selectedDate.getMonth();
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       {/* Header */}
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-serif text-[#1a1a1a]">Lịch Đặt Bàn</h1>
+        <h1 className="text-2xl font-serif text-[#1a1a1a]">Lịch Đặt Bàn</h1>
 
         <button
           onClick={goToToday}
-          className="px-4 py-2 bg-white border border-black/10 rounded-lg text-sm hover:bg-[#f8f6f4] transition"
+          className="px-3 py-1.5 bg-white border border-black/10 rounded-lg text-sm hover:bg-[#f8f6f4] transition"
         >
           Hôm nay
         </button>
       </div>
 
       {/* Month Navigation */}
-      <div className="bg-white rounded-xl p-4 shadow-sm border border-black/5">
+      <div className="bg-white rounded-lg p-2 shadow-sm border border-black/5">
         <div className="flex items-center justify-between">
           <button
             onClick={() => changeMonth(-1)}
-            className="p-2 hover:bg-[#f8f6f4] rounded-lg transition"
+            className="p-1.5 hover:bg-[#f8f6f4] rounded-lg transition"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
           </button>
 
           <div className="text-center">
-            <h2 className="text-2xl font-serif text-[#1a1a1a]">
+            <h2 className="text-lg font-serif text-[#1a1a1a]">
               Tháng {selectedDate.getMonth() + 1} / {selectedDate.getFullYear()}
             </h2>
-            <p className="text-sm text-[#8b857a] mt-1">
+            <p className="text-xs text-[#8b857a]">
               {bookings.filter((b) => {
                 const bookingMonth = new Date(b.dateTime).getMonth();
                 const bookingYear = new Date(b.dateTime).getFullYear();
@@ -160,11 +160,11 @@ export default function TimelinePage() {
       </div>
 
       {/* Calendar */}
-      <div className="bg-white rounded-xl shadow-sm border border-black/5 overflow-hidden">
+      <div className="bg-white rounded-lg shadow-sm border border-black/5 overflow-hidden">
         {/* Week days header */}
         <div className="grid grid-cols-7 bg-[#f8f6f4] border-b border-black/5">
           {["CN", "T2", "T3", "T4", "T5", "T6", "T7"].map((day) => (
-            <div key={day} className="p-3 text-center text-sm font-medium text-[#1a1a1a]">
+            <div key={day} className="p-1.5 text-center text-xs font-medium text-[#1a1a1a]">
               {day}
             </div>
           ))}
@@ -184,15 +184,15 @@ export default function TimelinePage() {
             return (
               <div
                 key={index}
-                className={`min-h-[120px] border-b border-r border-black/5 p-2 ${
+                className={`min-h-[80px] border-b border-r border-black/5 p-1.5 ${
                   !isCurrentMonth ? "bg-gray-50" : ""
                 } ${isPast ? "opacity-60" : ""}`}
               >
-                <div className="flex justify-between items-start mb-2">
+                <div className="flex justify-between items-start mb-1">
                   <span
-                    className={`text-sm font-medium ${
+                    className={`text-xs font-medium ${
                       isToday
-                        ? "bg-[#c9a24d] text-white w-7 h-7 rounded-full flex items-center justify-center"
+                        ? "bg-[#c9a24d] text-white w-5 h-5 rounded-full flex items-center justify-center"
                         : isCurrentMonth
                         ? "text-[#1a1a1a]"
                         : "text-[#8b857a]"
@@ -202,17 +202,17 @@ export default function TimelinePage() {
                   </span>
 
                   {dayBookings.length > 0 && (
-                    <span className="text-xs bg-[#c9a24d] text-white px-2 py-0.5 rounded-full font-medium">
+                    <span className="text-[10px] bg-[#c9a24d] text-white px-1.5 py-0.5 rounded-full font-medium">
                       {dayBookings.length}
                     </span>
                   )}
                 </div>
 
-                <div className="space-y-1">
-                  {dayBookings.slice(0, 3).map((booking) => (
+                <div className="space-y-0.5">
+                  {dayBookings.slice(0, 2).map((booking) => (
                     <div
                       key={booking.id}
-                      className={`text-xs p-1.5 rounded border ${getStatusColor(
+                      className={`text-[10px] p-1 rounded border ${getStatusColor(
                         booking.status
                       )}`}
                     >
@@ -223,15 +223,12 @@ export default function TimelinePage() {
                         })}{" "}
                         • {booking.customerName}
                       </div>
-                      <div className="text-[10px] opacity-75 truncate">
-                        {booking.guests} khách • {booking.comboName}
-                      </div>
                     </div>
                   ))}
 
-                  {dayBookings.length > 3 && (
-                    <div className="text-xs text-[#8b857a] text-center py-1">
-                      +{dayBookings.length - 3} đơn khác
+                  {dayBookings.length > 2 && (
+                    <div className="text-[9px] text-[#8b857a] text-center">
+                      +{dayBookings.length - 2}
                     </div>
                   )}
                 </div>
@@ -242,22 +239,22 @@ export default function TimelinePage() {
       </div>
 
       {/* Legend */}
-      <div className="bg-white rounded-xl p-4 shadow-sm border border-black/5">
-        <div className="flex flex-wrap gap-4 text-sm">
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded bg-yellow-100 border border-yellow-300"></div>
+      <div className="bg-white rounded-lg p-2 shadow-sm border border-black/5">
+        <div className="flex flex-wrap gap-3 text-xs">
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded bg-yellow-100 border border-yellow-300"></div>
             <span className="text-[#8b857a]">Chờ xác nhận</span>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded bg-blue-100 border border-blue-300"></div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded bg-blue-100 border border-blue-300"></div>
             <span className="text-[#8b857a]">Đã xác nhận</span>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded bg-green-100 border border-green-300"></div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded bg-green-100 border border-green-300"></div>
             <span className="text-[#8b857a]">Hoàn thành</span>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded bg-red-100 border border-red-300"></div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded bg-red-100 border border-red-300"></div>
             <span className="text-[#8b857a]">Đã hủy</span>
           </div>
         </div>

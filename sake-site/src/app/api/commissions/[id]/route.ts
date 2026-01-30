@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/db";
 
-// PATCH /api/commissions/[id] - Mark commission as paid (admin only)
+// PATCH /api/commissions/[id] - Update commission status (admin only)
 export async function PATCH(
   req: NextRequest,
   context: { params: Promise<{ id: string }> }
@@ -23,14 +23,13 @@ export async function PATCH(
     const commissionId = params.id;
 
     const body = await req.json();
-    const { isPaid } = body;
-
-    if (typeof isPaid !== "boolean") {
-      return NextResponse.json(
-        { ok: false, message: "Invalid isPaid value" },
-        { status: 400 }
-      );
-    }
+    const { 
+      action, // 'approve', 'pay', 'reject', 'cancel'
+      paymentMethod, 
+      paymentRef, 
+      paymentNotes,
+      rejectionReason 
+    } = body;
 
     // Check if commission exists
     const existingCommission = await prisma.commission.findUnique({
@@ -44,15 +43,82 @@ export async function PATCH(
       );
     }
 
-    // Update commission status
+    let updateData: any = {};
+    let message = "";
+
+    switch (action) {
+      case "approve":
+        if (existingCommission.status !== "PENDING") {
+          return NextResponse.json(
+            { ok: false, message: "Chỉ có thể duyệt commission PENDING" },
+            { status: 400 }
+          );
+        }
+        updateData = {
+          status: "APPROVED",
+          approvedAt: new Date(),
+          approvedBy: userIdFromCookie,
+        };
+        message = "Đã duyệt commission";
+        break;
+
+      case "pay":
+        if (existingCommission.status !== "APPROVED") {
+          return NextResponse.json(
+            { ok: false, message: "Chỉ có thể thanh toán commission đã APPROVED" },
+            { status: 400 }
+          );
+        }
+        updateData = {
+          status: "PAID",
+          isPaid: true,
+          paidAt: new Date(),
+          paymentMethod,
+          paymentRef,
+          paymentNotes,
+        };
+        message = "Đã thanh toán commission";
+        break;
+
+      case "reject":
+        if (existingCommission.status !== "PENDING") {
+          return NextResponse.json(
+            { ok: false, message: "Chỉ có thể từ chối commission PENDING" },
+            { status: 400 }
+          );
+        }
+        updateData = {
+          status: "REJECTED",
+          rejectedAt: new Date(),
+          rejectedBy: userIdFromCookie,
+          rejectionReason,
+        };
+        message = "Đã từ chối commission";
+        break;
+
+      case "cancel":
+        updateData = {
+          status: "CANCELLED",
+        };
+        message = "Đã hủy commission";
+        break;
+
+      default:
+        return NextResponse.json(
+          { ok: false, message: "Invalid action. Use: approve, pay, reject, cancel" },
+          { status: 400 }
+        );
+    }
+
+    // Update commission
     const updatedCommission = await prisma.commission.update({
       where: { id: commissionId },
-      data: { isPaid },
+      data: updateData,
     });
 
     return NextResponse.json({
       ok: true,
-      message: isPaid ? "Đã đánh dấu đã thanh toán" : "Đã đánh dấu chưa thanh toán",
+      message,
       commission: updatedCommission,
     });
   } catch (error) {

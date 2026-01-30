@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { FaCheck, FaTimes, FaClock, FaCheckCircle, FaTimesCircle } from "react-icons/fa";
+import UserTreeView from "./UserTreeView";
+import { FaCheck, FaTimes, FaClock, FaCheckCircle, FaTimesCircle, FaClipboardList, FaSitemap } from "react-icons/fa";
 
 type Booking = {
   id: string;
@@ -57,6 +58,7 @@ type SourceStats = {
 };
 
 export default function AdminDashboard() {
+  const [activeTab, setActiveTab] = useState<"bookings" | "organization">("bookings");
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -228,6 +230,10 @@ export default function AdminDashboard() {
         return "Web (Khách)";
       case "F2_SELF":
         return "Thành Viên F2";
+      case "F1_CREATE":
+        return "Đối Tác F1";
+      case "ADMIN_CREATE":
+        return "Admin Tạo";
       default:
         return source;
     }
@@ -269,16 +275,49 @@ export default function AdminDashboard() {
       {/* Header */}
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-serif text-[#1a1a1a]">
-          Quản Lý Đơn Hàng
+          {activeTab === "bookings" ? "Quản Lý Đơn Hàng" : "Quản Lý Nhân Sự"}
         </h1>
+        {activeTab === "bookings" && (
+          <button
+            onClick={fetchBookings}
+            className="px-4 py-2 bg-[#c9a24d] text-white rounded-lg hover:bg-[#b8933d] transition"
+          >
+            Làm mới
+          </button>
+        )}
+      </div>
+
+      {/* Tabs */}
+      <div className="flex gap-2 border-b border-gray-200">
         <button
-          onClick={fetchBookings}
-          className="px-4 py-2 bg-[#c9a24d] text-white rounded-lg hover:bg-[#b8933d] transition"
+          onClick={() => setActiveTab("bookings")}
+          className={`flex items-center gap-2 px-6 py-3 font-medium transition-all ${
+            activeTab === "bookings"
+              ? "text-[#c9a24d] border-b-2 border-[#c9a24d]"
+              : "text-gray-500 hover:text-gray-700"
+          }`}
         >
-          Làm mới
+          <FaClipboardList />
+          Đơn Hàng
+        </button>
+        <button
+          onClick={() => setActiveTab("organization")}
+          className={`flex items-center gap-2 px-6 py-3 font-medium transition-all ${
+            activeTab === "organization"
+              ? "text-[#c9a24d] border-b-2 border-[#c9a24d]"
+              : "text-gray-500 hover:text-gray-700"
+          }`}
+        >
+          <FaSitemap />
+          Cấu Trúc Tổ Chức
         </button>
       </div>
 
+      {/* Tab Content */}
+      {activeTab === "organization" ? (
+        <UserTreeView />
+      ) : (
+        <>
       {/* Statistics Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white rounded-xl p-6 shadow-sm border border-black/5">
@@ -563,6 +602,8 @@ export default function AdminDashboard() {
         variant={confirmDialog.action === "cancel" ? "danger" : "info"}
         isLoading={updating !== null}
       />
+      </>
+      )}
     </div>
   );
 }

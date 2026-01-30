@@ -62,7 +62,7 @@ export async function POST(request: Request) {
     }
 
     // Map role to route
-    let roleRoute = "customer";
+    let roleRoute = "";
     switch (user.role) {
       case "ADMIN":
         roleRoute = "admin";
@@ -74,12 +74,14 @@ export async function POST(request: Request) {
         roleRoute = "f2";
         break;
       case "CUSTOMER":
-        roleRoute = "customer";
+        // Customer doesn't need dashboard, redirect to home
+        roleRoute = "home";
         break;
     }
 
     // STRICT SCOPE VALIDATION: User must login at the correct portal
-    if (requestedScope && requestedScope !== roleRoute) {
+    // Customers are exempt from scope validation
+    if (requestedScope && requestedScope !== roleRoute && user.role !== "CUSTOMER") {
       const portalNames: Record<string, string> = {
         admin: "Quản trị viên",
         f1: "Đối tác chiến lược",
@@ -114,7 +116,7 @@ export async function POST(request: Request) {
         role: user.role,
         referralCode: user.referralCode,
       },
-      redirect: `/dashboard/${roleRoute}`,
+      redirect: user.role === "CUSTOMER" ? "/" : `/dashboard/${roleRoute}`,
     });
 
     // Set cookies

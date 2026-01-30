@@ -2,6 +2,8 @@
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/db";
 import { createBookingSchema } from "@/lib/validations";
+import { sendBookingConfirmationEmail } from "@/lib/email";
+import { sendZaloOABookingConfirmation } from "@/lib/zalo";
 
 type BookingPayload = {
   customerName?: string;
@@ -88,13 +90,22 @@ export async function POST(request: Request) {
     const subtotal = Math.round(comboPrice * guests);
 
     // Tính discount nếu có referral code
-    const { discount, discountReason } = await calculateDiscount(
-      referralCode,
-      subtotal
-    );
+    const referralDiscount = await calculateDiscount(referralCode, subtotal);
 
-    const finalTotal = subtotal - discount;
-    const depositAmount = hasDeposit ? Math.round(finalTotal * 0.2) : 0;
+    // Ưu đãi cọc online: giảm 10% khi đã đặt cọc 10%
+    const depositDiscount = hasDeposit ? Math.round(subtotal * 0.1) : 0;
+
+    const discount = referralDiscount.discount + depositDiscount;
+    const discountReason = referralDiscount.discountReason
+      ? depositDiscount
+        ? `${referralDiscount.discountReason}+ONLINE_DEPOSIT`
+        : referralDiscount.discountReason
+      : depositDiscount
+      ? "ONLINE_DEPOSIT"
+      : null;
+
+    const finalTotal = Math.max(subtotal - discount, 0);
+    const depositAmount = hasDeposit ? Math.round(subtotal * 0.1) : 0;
 
     // Xác định source và customer based on who creates the booking
     let source: "WEB_DIRECT" | "F2_SELF" | "F1_CREATE" = "WEB_DIRECT";
@@ -225,7 +236,6 @@ export async function POST(request: Request) {
               tier: 2, // Tầng 2 - Quản lý
               isPaid: false,
             },
-          },
           });
 
           await prisma.user.update({
@@ -239,6 +249,111 @@ export async function POST(request: Request) {
         }
       }
     }
+
+    // Tạo commission khi khách web đặt bàn với mã giới thiệu
+    // Khách web nhập mã F2 → F2 nhận Tầng 1 (10%) + F1 quản lý nhận Tầng 2 (5%)
+    if (source === "WEB_DIRECT" && referralCode) {
+      const f2Member = await prisma.user.findUnique({
+        where: { referralCode },
+        include: {
+          referredBy: true,
+        },
+      });
+
+      if (f2Member && f2Member.role === "F2_MEMBER" && f2Member.isActive) {
+        // 1. Hoa hồng Tầng 1 cho F2 (người được giới thiệu) - 10%
+        const tier1Rate = 10;
+        const tier1Amount = Math.round(finalTotal * (tier1Rate / 100));
+
+        await prisma.commission.create({
+          data: {
+            partnerId: f2Member.id,
+            bookingId: booking.id,
+            amount: tier1Amount,
+            rate: tier1Rate,
+            tier: 1, // Tầng 1 - Sale qua mã giới thiệu
+            isPaid: false,
+          },
+        });
+
+        await prisma.user.update({
+          where: { id: f2Member.id },
+          data: {
+            totalCommission: {
+              increment: tier1Amount,
+            },
+          },
+        });
+
+        console.log(`✅ Commission Tier 1 created for F2: ${f2Member.name} - ${tier1Amount.toLocaleString()}đ`);
+
+        // 2. Hoa hồng Tầng 2 cho F1 (người quản lý F2) - 5%
+        if (f2Member.referredBy) {
+          const tier2Rate = 5;
+          const tier2Amount = Math.round(finalTotal * (tier2Rate / 100));
+
+          await prisma.commission.create({
+            data: {
+              partnerId: f2Member.referredBy.id,
+              bookingId: booking.id,
+              amount: tier2Amount,
+              rate: tier2Rate,
+              tier: 2, // Tầng 2 - Quản lý
+              isPaid: false,
+            },
+          });
+
+          await prisma.user.update({
+            where: { id: f2Member.referredBy.id },
+            data: {
+              totalCommission: {
+                increment: tier2Amount,
+              },
+            },
+          });
+
+          console.log(`✅ Commission Tier 2 created for F1: ${f2Member.referredBy.name} - ${tier2Amount.toLocaleString()}đ`);
+        }
+      }
+    }
+
+    // 🚀 Send notifications (email + Zalo)
+    if (email) {
+      try {
+        await sendBookingConfirmationEmail({
+          bookingId: booking.id,
+          customerName,
+          customerEmail: email,
+          phone,
+          dateTime: dateTimeValue.toISOString(),
+          guests,
+          comboName,
+          finalTotal,
+          depositAmount,
+          discount,
+          notes,
+        });
+        console.log("✅ Email notification sent to:", email);
+      } catch (emailError) {
+        console.error("❌ Email notification failed:", emailError);
+        // Don't fail the booking if email fails
+      }
+    }
+
+    // Send Zalo OA notification (async, don't wait)
+    sendZaloOABookingConfirmation({
+      bookingId: booking.id,
+      customerName,
+      phone,
+      dateTime: dateTimeValue.toISOString(),
+      guests,
+      comboName,
+      finalTotal,
+      depositAmount,
+    }).catch((zaloError) => {
+      console.error("❌ Zalo notification failed:", zaloError);
+      // Don't fail the booking if Zalo fails
+    });
 
     return NextResponse.json({ ok: true, booking });
   } catch (error) {
@@ -318,6 +433,24 @@ export async function GET(request: Request) {
       // F2/Customer chỉ xem bookings của chính mình
       bookings = await prisma.booking.findMany({
         where: { customerId: userIdFromCookie },
+        include: {
+          customer: {
+            select: { 
+              id: true, 
+              name: true, 
+              email: true, 
+              phone: true, 
+              role: true 
+            },
+          },
+          createdBy: {
+            select: { 
+              id: true, 
+              name: true, 
+              role: true 
+            },
+          },
+        },
         orderBy: { createdAt: "desc" },
       });
     } else {

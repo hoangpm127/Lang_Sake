@@ -26,7 +26,12 @@ export function middleware(request: NextRequest) {
 
   if (pathname === "/dashboard") {
     const url = request.nextUrl.clone();
-    url.pathname = `/dashboard/${roleCookie}`;
+    // Customer doesn't have dashboard, redirect to home
+    if (roleCookie === "customer") {
+      url.pathname = "/";
+    } else {
+      url.pathname = `/dashboard/${roleCookie}`;
+    }
     return NextResponse.redirect(url);
   }
 

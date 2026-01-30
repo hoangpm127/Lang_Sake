@@ -43,6 +43,7 @@ export default function BookingForm({ userId, onSuccess, isF1Creating }: { userI
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [bookingDetails, setBookingDetails] = useState<any>(null);
 
   const handleComboChange = (comboName: string) => {
     const combo = COMBOS.find((c) => c.name === comboName);
@@ -79,6 +80,7 @@ export default function BookingForm({ userId, onSuccess, isF1Creating }: { userI
       }
 
       setSuccess(true);
+      setBookingDetails(data.booking);
       toast.success("Đặt bàn thành công!");
       
       // Call onSuccess callback if provided
@@ -108,23 +110,147 @@ export default function BookingForm({ userId, onSuccess, isF1Creating }: { userI
   const calculateTotal = () => {
     const subtotal = formData.comboPrice * formData.guests;
     // Simple estimate - actual discount calculated on server
-    const discount = formData.referralCode ? Math.round(subtotal * 0.1) : 0;
-    const finalTotal = subtotal - discount;
-    return { subtotal, discount, finalTotal };
+    const referralDiscount = formData.referralCode ? Math.round(subtotal * 0.1) : 0;
+    const depositDiscount = formData.hasDeposit ? Math.round(subtotal * 0.1) : 0;
+    const totalDiscount = referralDiscount + depositDiscount;
+    const finalTotal = subtotal - totalDiscount;
+    return { subtotal, finalTotal, referralDiscount, depositDiscount };
   };
 
-  const { subtotal, discount, finalTotal } = calculateTotal();
+  const { subtotal, finalTotal, referralDiscount, depositDiscount } = calculateTotal();
 
-  if (success) {
+  if (success && bookingDetails) {
+    const formatDateTime = (dateTimeString: string) => {
+      return new Date(dateTimeString).toLocaleString("vi-VN", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    };
+
+    const formatCurrency = (amount: number) => {
+      return new Intl.NumberFormat("vi-VN", {
+        style: "currency",
+        currency: "VND",
+      }).format(amount);
+    };
+
     return (
-      <div className="rounded-3xl border border-green-500/20 bg-green-50 p-8 text-center">
-        <div className="text-6xl mb-4">✅</div>
-        <h3 className="text-2xl font-serif text-green-800 mb-2">
-          Đặt bàn thành công!
-        </h3>
-        <p className="text-green-600">
-          Chúng tôi sẽ liên hệ với bạn trong thời gian sớm nhất.
-        </p>
+      <div className="space-y-6">
+        {/* Success Header */}
+        <div className="rounded-3xl border border-green-500/20 bg-gradient-to-br from-green-50 to-emerald-50 p-8 text-center">
+          <div className="text-6xl mb-4">🎉</div>
+          <h3 className="text-2xl font-serif text-green-800 mb-2">
+            Đặt bàn thành công!
+          </h3>
+          <p className="text-green-700 mb-1">
+            Cảm ơn bạn đã tin tưởng Lang Sake
+          </p>
+          <p className="text-sm text-green-600">
+            Chúng tôi sẽ liên hệ xác nhận trong thời gian sớm nhất
+          </p>
+        </div>
+
+        {/* Booking Details Card */}
+        <div className="rounded-2xl border-2 border-[#c9a24d] bg-white shadow-lg overflow-hidden">
+          {/* Header */}
+          <div className="bg-gradient-to-r from-[#c9a24d] to-[#b8914d] p-6 text-white">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm opacity-90 mb-1">Mã đặt bàn của bạn</p>
+                <p className="text-3xl font-bold tracking-wider font-mono">
+                  {bookingDetails.id.substring(0, 8).toUpperCase()}
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(bookingDetails.id);
+                  toast.success("Đã copy mã đặt bàn!");
+                }}
+                className="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition text-sm font-medium flex items-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
+                Copy
+              </button>
+            </div>
+          </div>
+
+          {/* Details */}
+          <div className="p-6 space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-xs text-[#8b857a] mb-1">Khách hàng</p>
+                <p className="text-sm font-semibold text-[#1a1a1a]">{bookingDetails.customerName}</p>
+                <p className="text-xs text-[#8b857a]">{bookingDetails.phone}</p>
+              </div>
+              <div>
+                <p className="text-xs text-[#8b857a] mb-1">Thời gian</p>
+                <p className="text-sm font-semibold text-[#1a1a1a]">{formatDateTime(bookingDetails.dateTime)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-[#8b857a] mb-1">Combo</p>
+                <p className="text-sm font-semibold text-[#1a1a1a]">{bookingDetails.comboName}</p>
+              </div>
+              <div>
+                <p className="text-xs text-[#8b857a] mb-1">Số khách</p>
+                <p className="text-sm font-semibold text-[#1a1a1a]">{bookingDetails.guests} người</p>
+              </div>
+            </div>
+
+            <div className="border-t border-black/10 pt-4">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-[#8b857a]">Tổng tiền:</span>
+                <span className="text-xl font-bold text-[#c9a24d]">{formatCurrency(bookingDetails.finalTotal)}</span>
+              </div>
+              {bookingDetails.depositAmount > 0 && (
+                <div className="flex justify-between items-center mt-2">
+                  <span className="text-sm text-green-700">Đã đặt cọc:</span>
+                  <span className="text-lg font-semibold text-green-700">{formatCurrency(bookingDetails.depositAmount)}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Instructions */}
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+              <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <div className="flex-1">
+              <h4 className="text-sm font-semibold text-blue-900 mb-2">Lưu ý quan trọng</h4>
+              <ul className="text-sm text-blue-700 space-y-1">
+                <li>📱 <strong>Lưu mã đặt bàn</strong> để tra cứu và check-in</li>
+                <li>📞 Chúng tôi sẽ gọi điện xác nhận trong 24h</li>
+                <li>💳 {bookingDetails.depositAmount > 0 ? 'Vui lòng thanh toán cọc để giữ chỗ' : 'Thanh toán trực tiếp tại quán'}</li>
+                <li>🔍 Tra cứu đơn tại: <a href="/booking/lookup" className="underline font-medium">langsake.vn/booking/lookup</a></li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex gap-3">
+          <button
+            onClick={() => router.push('/booking/lookup?id=' + bookingDetails.id)}
+            className="flex-1 px-6 py-3 bg-white border-2 border-[#c9a24d] text-[#c9a24d] rounded-xl font-medium hover:bg-[#c9a24d] hover:text-white transition"
+          >
+            Tra cứu đơn hàng
+          </button>
+          <button
+            onClick={() => router.push('/')}
+            className="flex-1 px-6 py-3 bg-[#c9a24d] text-white rounded-xl font-medium hover:bg-[#b8914d] transition"
+          >
+            Về trang chủ
+          </button>
+        </div>
       </div>
     );
   }
@@ -285,7 +411,7 @@ export default function BookingForm({ userId, onSuccess, isF1Creating }: { userI
               Đặt cọc trước 10%
             </p>
             <p className="text-xs text-[#8b857a] mt-1">
-              Đặt cọc để đảm bảo chỗ và nhận ưu đãi
+              Cọc online 10% để đảm bảo chỗ và nhận giảm 10% khi thanh toán tại dịch vụ
             </p>
           </div>
         </label>
@@ -300,11 +426,19 @@ export default function BookingForm({ userId, onSuccess, isF1Creating }: { userI
               {subtotal.toLocaleString("vi-VN")}₫
             </span>
           </div>
-          {discount > 0 && (
+          {referralDiscount > 0 && (
             <div className="flex justify-between text-sm">
-              <span className="text-green-600">Giảm giá:</span>
+              <span className="text-green-600">Giảm theo mã:</span>
               <span className="text-green-600 font-medium">
-                -{discount.toLocaleString("vi-VN")}₫
+                -{referralDiscount.toLocaleString("vi-VN")}₫
+              </span>
+            </div>
+          )}
+          {depositDiscount > 0 && (
+            <div className="flex justify-between text-sm">
+              <span className="text-green-600">Ưu đãi cọc 10%:</span>
+              <span className="text-green-600 font-medium">
+                -{depositDiscount.toLocaleString("vi-VN")}₫
               </span>
             </div>
           )}
@@ -318,7 +452,7 @@ export default function BookingForm({ userId, onSuccess, isF1Creating }: { userI
             <div className="flex justify-between text-sm pt-1">
               <span className="text-[#8b857a]">Cần đặt cọc:</span>
               <span className="font-medium text-[#c9a24d]">
-                {Math.round(finalTotal * 0.1).toLocaleString("vi-VN")}₫
+                {Math.round(subtotal * 0.1).toLocaleString("vi-VN")}₫
               </span>
             </div>
           )}

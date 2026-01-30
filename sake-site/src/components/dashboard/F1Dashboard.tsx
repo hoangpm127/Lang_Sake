@@ -2,8 +2,22 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import BookingForm from "@/components/booking/BookingForm";
-import { FaPlus } from "react-icons/fa";
+
+type F2Member = {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  referralCode: string;
+  discountRate: number;
+  createdAt: string;
+  stats: {
+    totalBookings: number;
+    totalRevenue: number;
+    completedBookings: number;
+    tier1Commission: number;
+  };
+};
 
 type Booking = {
   id: string;
@@ -15,7 +29,7 @@ type Booking = {
   comboName: string;
   finalTotal: number;
   status: string;
-  source: string;
+  source: "WEB_DIRECT" | "F2_SELF" | "F1_CREATE" | "ADMIN_CREATE";
   customer?: {
     id: string;
     name: string;
@@ -32,15 +46,17 @@ type Booking = {
 
 export default function F1Dashboard() {
   const [bookings, setBookings] = useState<Booking[]>([]);
+  const [f2Members, setF2Members] = useState<F2Member[]>([]);
+  const [selectedF2, setSelectedF2] = useState<string>("all");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [referralCode, setReferralCode] = useState<string>("");
   const [userName, setUserName] = useState<string>("Partner");
-  const [showBookingForm, setShowBookingForm] = useState(false);
 
   useEffect(() => {
     fetchBookings();
     fetchUserProfile();
+    fetchF2Members();
   }, []);
 
   const handleLogout = async () => {
@@ -84,11 +100,34 @@ export default function F1Dashboard() {
     }
   };
 
-  const totalRevenue = bookings
+  const fetchF2Members = async () => {
+    try {
+      const response = await fetch("/api/f2-members");
+      const data = await response.json();
+
+      if (data.ok) {
+        setF2Members(data.f2Members);
+      }
+    } catch (err) {
+      console.error("Failed to fetch F2 members:", err);
+    }
+  };
+
+  // Filter bookings theo F2 được chọn
+  const filteredBookings = selectedF2 === "all" 
+    ? bookings 
+    : bookings.filter((b) => b.customer?.id === selectedF2);
+
+  const totalRevenue = filteredBookings
     .filter((b) => b.status !== "CANCELLED")
     .reduce((sum, b) => sum + b.finalTotal, 0);
 
-  const totalCommission = totalRevenue * 0.1; // Giả sử 10% hoa hồng
+  // Tính hoa hồng: tier 2 (5%) cho F1 từ F2, tier 1 (10%) nếu F1 tạo
+  const tier2Revenue = bookings
+    .filter((b) => b.status !== "CANCELLED" && b.source === "F2_SELF")
+    .reduce((sum, b) => sum + b.finalTotal, 0);
+  
+  const totalCommission = tier2Revenue * 0.05; // Tier 2: 5% từ F2
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("vi-VN", {
@@ -150,15 +189,26 @@ export default function F1Dashboard() {
             <h1 className="text-3xl font-serif mb-2">Chào mừng, {userName}!</h1>
             <p className="text-white/80">Quản lý đơn hàng và theo dõi hoa hồng</p>
           </div>
-          <button
-            onClick={handleLogout}
-            className="flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition text-white text-sm font-medium"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-            </svg>
-            Đăng xuất
-          </button>
+          <div className="flex items-center gap-3">
+            <a
+              href="/dashboard/f1/commissions"
+              className="flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition text-white text-sm font-medium"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              Thu nhập
+            </a>
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition text-white text-sm font-medium"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+              </svg>
+              Đăng xuất
+            </button>
+          </div>
         </div>
       </div>
 
@@ -202,7 +252,21 @@ export default function F1Dashboard() {
       )}
 
       {/* Statistics Cards */}
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid gap-4 lg:grid-cols-4">
+        <div className="bg-white rounded-xl p-6 shadow-sm border border-black/5">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 bg-purple-50 rounded-lg flex items-center justify-center">
+              <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-sm text-[#8b857a]">Thành viên F2</p>
+              <p className="text-2xl font-bold text-[#1a1a1a]">{f2Members.length}</p>
+            </div>
+          </div>
+        </div>
+
         <div className="bg-white rounded-xl p-6 shadow-sm border border-black/5">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 bg-blue-50 rounded-lg flex items-center justify-center">
@@ -212,7 +276,7 @@ export default function F1Dashboard() {
             </div>
             <div>
               <p className="text-sm text-[#8b857a]">Tổng đơn</p>
-              <p className="text-2xl font-bold text-[#1a1a1a]">{bookings.length}</p>
+              <p className="text-2xl font-bold text-[#1a1a1a]">{filteredBookings.length}</p>
             </div>
           </div>
         </div>
@@ -239,31 +303,101 @@ export default function F1Dashboard() {
               </svg>
             </div>
             <div>
-              <p className="text-sm text-[#8b857a]">Hoa hồng dự kiến</p>
+              <p className="text-sm text-[#8b857a]">Hoa hồng Tier 2</p>
               <p className="text-xl font-bold text-[#c9a24d]">{formatCurrency(totalCommission)}</p>
-              <p className="text-xs text-[#8b857a] mt-1">~10% doanh thu</p>
+              <p className="text-xs text-[#8b857a] mt-1">5% từ F2</p>
             </div>
           </div>
         </div>
       </div>
 
+      {/* F2 Members Management */}
+      {f2Members.length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm border border-black/5 overflow-hidden">
+          <div className="p-6 border-b border-black/5">
+            <h2 className="text-xl font-serif text-[#1a1a1a]">Quản lý Thành viên F2</h2>
+            <p className="text-sm text-[#8b857a] mt-1">
+              {f2Members.length} thành viên đang hoạt động
+            </p>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-[#f8f6f4]">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-[#8b857a] uppercase">Thành viên</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-[#8b857a] uppercase">Mã giới thiệu</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-[#8b857a] uppercase">Chiết khấu</th>
+                  <th className="px-6 py-3 text-right text-xs font-semibold text-[#8b857a] uppercase">Số đơn</th>
+                  <th className="px-6 py-3 text-right text-xs font-semibold text-[#8b857a] uppercase">Doanh thu</th>
+                  <th className="px-6 py-3 text-right text-xs font-semibold text-[#8b857a] uppercase">Hoa hồng T1 (F2)</th>
+                  <th className="px-6 py-3 text-center text-xs font-semibold text-[#8b857a] uppercase">Hành động</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-black/5">
+                {f2Members.map((f2) => (
+                  <tr key={f2.id} className="hover:bg-[#f8f6f4] transition">
+                    <td className="px-6 py-4">
+                      <div>
+                        <p className="text-sm font-medium text-[#1a1a1a]">{f2.name}</p>
+                        <p className="text-xs text-[#8b857a]">{f2.email}</p>
+                        <p className="text-xs text-[#8b857a]">{f2.phone}</p>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-mono font-medium bg-purple-50 text-purple-700">
+                        {f2.referralCode}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="text-sm font-medium text-green-600">{f2.discountRate}%</span>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <div>
+                        <p className="text-sm font-semibold text-[#1a1a1a]">{f2.stats.totalBookings}</p>
+                        <p className="text-xs text-[#8b857a]">{f2.stats.completedBookings} hoàn thành</p>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <span className="text-sm font-semibold text-green-600">{formatCurrency(f2.stats.totalRevenue)}</span>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <span className="text-sm font-semibold text-[#c9a24d]">{formatCurrency(f2.stats.tier1Commission)}</span>
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <button
+                        onClick={() => setSelectedF2(f2.id)}
+                        className="text-xs px-3 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-lg transition font-medium"
+                      >
+                        Xem đơn hàng
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       {/* Bookings Table */}
       <div className="bg-white rounded-xl shadow-sm border border-black/5 overflow-hidden">
         <div className="p-6 border-b border-black/5 flex justify-between items-center">
           <div>
-            <h2 className="text-xl font-serif text-[#1a1a1a]">Đơn hàng của bạn</h2>
+            <h2 className="text-xl font-serif text-[#1a1a1a]">Đơn hàng</h2>
             <p className="text-sm text-[#8b857a] mt-1">
-              Tổng doanh thu: <span className="font-semibold text-green-600">{formatCurrency(totalRevenue)}</span> • 
-              Hoa hồng: <span className="font-semibold text-[#c9a24d]">{formatCurrency(totalCommission)}</span>
+              {selectedF2 === "all" ? "Tất cả đơn hàng" : `Đơn hàng của ${f2Members.find(f => f.id === selectedF2)?.name || "F2"}`}
             </p>
           </div>
-          <button
-            onClick={() => setShowBookingForm(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-[#c9a24d] hover:bg-[#b8914d] text-white rounded-lg transition font-medium"
-          >
-            <FaPlus className="w-4 h-4" />
-            Tạo Booking
-          </button>
+          
+          {selectedF2 !== "all" && (
+            <button
+              onClick={() => setSelectedF2("all")}
+              className="text-sm px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition font-medium"
+            >
+              ← Xem tất cả
+            </button>
+          )}
         </div>
 
         {bookings.length === 0 ? (
@@ -291,8 +425,8 @@ export default function F1Dashboard() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-black/5">
-                {bookings.map((booking) => {
-                  const commission = booking.finalTotal * 0.1;
+                {filteredBookings.map((booking) => {
+                  const commission = booking.finalTotal * 0.05; // Tier 2: 5%
                   const statusConfig = {
                     CONFIRMED: { bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-200", label: "Đã xác nhận" },
                     PENDING: { bg: "bg-yellow-50", text: "text-yellow-700", border: "border-yellow-200", label: "Chờ xác nhận" },
@@ -301,14 +435,9 @@ export default function F1Dashboard() {
                   };
                   const config = statusConfig[booking.status as keyof typeof statusConfig] || statusConfig.PENDING;
                   
-                  // Xác định nguồn đơn hàng
-                  let sourceLabel = "Web trực tiếp";
-                  let sourceClass = "bg-gray-50 text-gray-600";
-                  
-                  if (booking.customer?.role === "F2_MEMBER") {
-                    sourceLabel = `F2: ${booking.customer.name}`;
-                    sourceClass = "bg-purple-50 text-purple-700";
-                  }
+                  // Xác định nguồn đơn hàng - F1 chỉ xem được bookings từ F2 member
+                  const sourceLabel = `F2: ${booking.customer?.name || booking.customerName}`;
+                  const sourceClass = "bg-purple-50 text-purple-700";
                   
                   return (
                     <tr key={booking.id} className="hover:bg-[#f8f6f4] transition">
@@ -354,35 +483,6 @@ export default function F1Dashboard() {
           </div>
         )}
       </div>
-
-      {/* Booking Form Modal */}
-      {showBookingForm && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
-            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center rounded-t-2xl">
-              <h3 className="text-2xl font-bold text-[#1a1a1a]">Tạo Booking Cho Khách</h3>
-              <button
-                onClick={() => setShowBookingForm(false)}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            <div className="p-6">
-              <BookingForm 
-                onSuccess={() => {
-                  setShowBookingForm(false);
-                  fetchData();
-                  toast.success('Đã tạo booking thành công! Hoa hồng sẽ được tính tự động.');
-                }}
-                isF1Creating={true}
-              />
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

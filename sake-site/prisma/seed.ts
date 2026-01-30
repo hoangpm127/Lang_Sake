@@ -29,7 +29,7 @@ async function main() {
   });
   console.log("✅ Created Admin:", admin.email);
 
-  // 2. Tạo F1 Partners
+  // 2. Tạo F1 Partners (Auto-generate referral code)
   const f1Partner1 = await prisma.user.create({
     data: {
       email: "partner1@company.com",
@@ -37,7 +37,7 @@ async function main() {
       password: hashedPartnerPassword,
       name: "Công ty ABC",
       role: "F1_PARTNER",
-      referralCode: "PARTNER001",
+      referralCode: `F1${Date.now().toString(36).toUpperCase()}`, // Auto F1 code
       commissionRate: 10, // 10% hoa hồng
       isActive: true,
     },
@@ -50,14 +50,14 @@ async function main() {
       password: hashedPartnerPassword,
       name: "Công ty XYZ",
       role: "F1_PARTNER",
-      referralCode: "PARTNER002",
+      referralCode: `F1${(Date.now() + 1).toString(36).toUpperCase()}`, // Auto F1 code
       commissionRate: 15, // 15% hoa hồng
       isActive: true,
     },
   });
-  console.log("✅ Created F1 Partners:", f1Partner1.name, f1Partner2.name);
+  console.log("✅ Created F1 Partners:", f1Partner1.name, `(${f1Partner1.referralCode})`, f1Partner2.name, `(${f1Partner2.referralCode})`);
 
-  // 3. Tạo F2 Members
+  // 3. Tạo F2 Members (Auto-generate referral code)
   const f2Member1 = await prisma.user.create({
     data: {
       email: "member1@gmail.com",
@@ -65,7 +65,7 @@ async function main() {
       password: hashedMemberPassword,
       name: "Nguyễn Văn A",
       role: "F2_MEMBER",
-      referralCode: "MEMBER001",
+      referralCode: `F2${Date.now().toString(36).toUpperCase()}`, // Auto F2 code
       discountRate: 10, // 10% discount
       membershipLevel: "GOLD",
       referredById: f1Partner1.id, // Được giới thiệu bởi Partner1
@@ -80,7 +80,7 @@ async function main() {
       password: hashedMemberPassword,
       name: "Trần Thị B",
       role: "F2_MEMBER",
-      referralCode: "MEMBER002",
+      referralCode: `F2${(Date.now() + 2).toString(36).toUpperCase()}`, // Auto F2 code
       discountRate: 15, // 15% discount
       membershipLevel: "VIP",
       referredById: f1Partner2.id,

@@ -32,6 +32,15 @@ enum BookingStatus {
   NO_SHOW            // Không đến
 }
 
+// Trạng thái hoa hồng
+enum CommissionStatus {
+  PENDING            // Mới tạo, chưa duyệt
+  APPROVED           // Đã duyệt, chờ thanh toán
+  PAID               // Đã thanh toán
+  CANCELLED          // Hủy (do booking bị cancel)
+  REJECTED           // Từ chối (admin reject)
+}
+
 // Người dùng
 model User {
   id              String   @id @default(cuid())
@@ -119,20 +128,37 @@ model Booking {
 
 // Hoa hồng (cho F1)
 model Commission {
-  id              String   @id @default(cuid())
+  id              String            @id @default(cuid())
   
   partnerId       String
-  partner         User     @relation(fields: [partnerId], references: [id])
+  partner         User              @relation(fields: [partnerId], references: [id])
   
   bookingId       String
-  booking         Booking  @relation(fields: [bookingId], references: [id])
+  booking         Booking           @relation(fields: [bookingId], references: [id])
   
-  amount          Float    // Số tiền hoa hồng
-  rate            Float    // % hoa hồng tại thời điểm tính
-  tier            Int      @default(1) // 1 = Tầng 1 (sale trực tiếp 8-12%), 2 = Tầng 2 (quản lý 5%)
+  amount          Float             // Số tiền hoa hồng
+  rate            Float             // % hoa hồng tại thời điểm tính
+  tier            Int               @default(1) // 1 = Tầng 1 (sale trực tiếp 8-12%), 2 = Tầng 2 (quản lý 5%)
   
-  isPaid          Boolean  @default(false)
+  // Workflow status
+  status          CommissionStatus  @default(PENDING)
+  
+  // Payment tracking
+  isPaid          Boolean           @default(false) // Deprecated - dùng status thay thế
   paidAt          DateTime?
+  paymentMethod   String?           // VNPay, Momo, Bank Transfer, Cash
+  paymentRef      String?           // Mã giao dịch
+  paymentNotes    String?           // Ghi chú thanh toán
   
-  createdAt       DateTime @default(now())
+  // Approval tracking
+  approvedAt      DateTime?
+  approvedBy      String?           // Admin ID who approved
+  
+  // Rejection tracking
+  rejectedAt      DateTime?
+  rejectedBy      String?           // Admin ID who rejected
+  rejectionReason String?           // Lý do từ chối
+  
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @default(now()) @updatedAt
 }
