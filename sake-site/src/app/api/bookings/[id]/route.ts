@@ -215,6 +215,14 @@ export async function PATCH(
       );
     }
 
+    // If booking is being cancelled, void related commissions
+    if (status === "CANCELLED" || status === "NO_SHOW") {
+      await prisma.commission.updateMany({
+        where: { bookingId: id },
+        data: { isPaid: false }, // Reset payment status to unpaid/void
+      });
+    }
+
     // Update booking
     const booking = await prisma.booking.update({
       where: { id },

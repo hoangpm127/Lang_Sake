@@ -129,6 +129,7 @@ model Commission {
   
   amount          Float    // Số tiền hoa hồng
   rate            Float    // % hoa hồng tại thời điểm tính
+  tier            Int      @default(1) // 1 = Tầng 1 (sale trực tiếp 8-12%), 2 = Tầng 2 (quản lý 5%)
   
   isPaid          Boolean  @default(false)
   paidAt          DateTime?

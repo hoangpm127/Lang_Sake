@@ -26,7 +26,7 @@ const COMBOS = [
   { name: "Sake & Sushi Combo", price: 1500000, description: "4 người" },
 ];
 
-export default function BookingForm({ userId, onSuccess }: { userId?: string; onSuccess?: () => void }) {
+export default function BookingForm({ userId, onSuccess, isF1Creating }: { userId?: string; onSuccess?: () => void; isF1Creating?: boolean }) {
   const router = useRouter();
   const [formData, setFormData] = useState<BookingFormData>({
     customerName: "",
@@ -61,10 +61,15 @@ export default function BookingForm({ userId, onSuccess }: { userId?: string; on
     setError(null);
 
     try {
+      // Add isF1Creating flag to the request body
+      const bodyData = isF1Creating 
+        ? { ...formData, isF1Creating: true }
+        : formData;
+
       const response = await fetch("/api/bookings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(bodyData),
       });
 
       const data = await response.json();

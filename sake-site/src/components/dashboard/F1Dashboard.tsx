@@ -1,6 +1,9 @@
 ﻿"use client";
 
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
+import BookingForm from "@/components/booking/BookingForm";
+import { FaPlus } from "react-icons/fa";
 
 type Booking = {
   id: string;
@@ -33,6 +36,7 @@ export default function F1Dashboard() {
   const [error, setError] = useState<string | null>(null);
   const [referralCode, setReferralCode] = useState<string>("");
   const [userName, setUserName] = useState<string>("Partner");
+  const [showBookingForm, setShowBookingForm] = useState(false);
 
   useEffect(() => {
     fetchBookings();
@@ -245,12 +249,21 @@ export default function F1Dashboard() {
 
       {/* Bookings Table */}
       <div className="bg-white rounded-xl shadow-sm border border-black/5 overflow-hidden">
-        <div className="p-6 border-b border-black/5">
-          <h2 className="text-xl font-serif text-[#1a1a1a]">Đơn hàng của bạn</h2>
-          <p className="text-sm text-[#8b857a] mt-1">
-            Tổng doanh thu: <span className="font-semibold text-green-600">{formatCurrency(totalRevenue)}</span> • 
-            Hoa hồng: <span className="font-semibold text-[#c9a24d]">{formatCurrency(totalCommission)}</span>
-          </p>
+        <div className="p-6 border-b border-black/5 flex justify-between items-center">
+          <div>
+            <h2 className="text-xl font-serif text-[#1a1a1a]">Đơn hàng của bạn</h2>
+            <p className="text-sm text-[#8b857a] mt-1">
+              Tổng doanh thu: <span className="font-semibold text-green-600">{formatCurrency(totalRevenue)}</span> • 
+              Hoa hồng: <span className="font-semibold text-[#c9a24d]">{formatCurrency(totalCommission)}</span>
+            </p>
+          </div>
+          <button
+            onClick={() => setShowBookingForm(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-[#c9a24d] hover:bg-[#b8914d] text-white rounded-lg transition font-medium"
+          >
+            <FaPlus className="w-4 h-4" />
+            Tạo Booking
+          </button>
         </div>
 
         {bookings.length === 0 ? (
@@ -341,6 +354,35 @@ export default function F1Dashboard() {
           </div>
         )}
       </div>
+
+      {/* Booking Form Modal */}
+      {showBookingForm && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center rounded-t-2xl">
+              <h3 className="text-2xl font-bold text-[#1a1a1a]">Tạo Booking Cho Khách</h3>
+              <button
+                onClick={() => setShowBookingForm(false)}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="p-6">
+              <BookingForm 
+                onSuccess={() => {
+                  setShowBookingForm(false);
+                  fetchData();
+                  toast.success('Đã tạo booking thành công! Hoa hồng sẽ được tính tự động.');
+                }}
+                isF1Creating={true}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

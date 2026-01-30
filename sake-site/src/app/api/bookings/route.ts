@@ -96,14 +96,24 @@ export async function POST(request: Request) {
     const finalTotal = subtotal - discount;
     const depositAmount = hasDeposit ? Math.round(finalTotal * 0.2) : 0;
 
-    // Xác định source và customer
-    let source: "WEB_DIRECT" | "F2_SELF" = "WEB_DIRECT"; // Default cho khách vãng lai
+    // Xác định source và customer based on who creates the booking
+    let source: "WEB_DIRECT" | "F2_SELF" | "F1_CREATE" = "WEB_DIRECT";
     let customerId: string | undefined = undefined;
+    let createdById: string | undefined = undefined;
 
-    // Chỉ F2 member mới có source khác
     if (roleFromCookie === "f2" && userIdFromCookie) {
+      // F2 member tự đặt cho mình
       source = "F2_SELF";
       customerId = userIdFromCookie;
+    } else if (roleFromCookie === "f1" && userIdFromCookie) {
+      // F1 partner tạo booking cho khách
+      source = "F1_CREATE";
+      createdById = userIdFromCookie;
+      // customerId sẽ là null vì đây là khách của F1, không phải user trong hệ thống
+    } else if (roleFromCookie === "admin" && userIdFromCookie) {
+      // Admin tạo booking
+      source = "ADMIN_CREATE";
+      createdById = userIdFromCookie;
     }
 
     // Tạo booking
@@ -127,8 +137,108 @@ export async function POST(request: Request) {
         status: "PENDING",
         referralCode,
         notes,
+        createdById,
       },
     });
+
+    // Tạo commission cho F1 nếu là F1 tạo booking
+    // F1 bán trực tiếp → F1 nhận hoa hồng Tầng 1 (10%)
+    if (source === "F1_CREATE" && createdById) {
+      const f1Partner = await prisma.user.findUnique({
+        where: { id: createdById },
+      });
+
+      if (f1Partner && f1Partner.commissionRate) {
+        const commissionAmount = Math.round(
+          finalTotal * (f1Partner.commissionRate / 100)
+        );
+
+        await prisma.commission.create({
+          data: {
+            partnerId: createdById,
+            bookingId: booking.id,
+            amount: commissionAmount,
+            rate: f1Partner.commissionRate,
+            tier: 1, // Tầng 1 - Sale trực tiếp
+            isPaid: false,
+          },
+        });
+
+        // Update total commission của F1
+        await prisma.user.update({
+          where: { id: createdById },
+          data: {
+            totalCommission: {
+              increment: commissionAmount,
+            },
+          },
+        });
+      }
+    }
+
+    // Tạo commission cho F2 và F1 nếu booking từ F2 member
+    // F2 bán → F2 nhận Tầng 1 (10%) + F1 quản lý nhận Tầng 2 (5%)
+    if (source === "F2_SELF" && customerId) {
+      const f2Member = await prisma.user.findUnique({
+        where: { id: customerId },
+        include: {
+          referredBy: true,
+        },
+      });
+
+      if (f2Member) {
+        // 1. Hoa hồng Tầng 1 cho F2 (người bán trực tiếp) - 10%
+        const tier1Rate = 10;
+        const tier1Amount = Math.round(finalTotal * (tier1Rate / 100));
+
+        await prisma.commission.create({
+          data: {
+            partnerId: f2Member.id,
+            bookingId: booking.id,
+            amount: tier1Amount,
+            rate: tier1Rate,
+            tier: 1, // Tầng 1 - Sale trực tiếp
+            isPaid: false,
+          },
+        });
+
+        await prisma.user.update({
+          where: { id: f2Member.id },
+          data: {
+            totalCommission: {
+              increment: tier1Amount,
+            },
+          },
+        });
+
+        // 2. Hoa hồng Tầng 2 cho F1 (người quản lý F2) - 5%
+        if (f2Member.referredBy) {
+          const tier2Rate = 5;
+          const tier2Amount = Math.round(finalTotal * (tier2Rate / 100));
+
+          await prisma.commission.create({
+            data: {
+              partnerId: f2Member.referredBy.id,
+              bookingId: booking.id,
+              amount: tier2Amount,
+              rate: tier2Rate,
+              tier: 2, // Tầng 2 - Quản lý
+              isPaid: false,
+            },
+          },
+          });
+
+          await prisma.user.update({
+            where: { id: f2Member.referredBy.id },
+            data: {
+              totalCommission: {
+                increment: tier2Amount,
+              },
+            },
+          });
+        }
+      }
+    }
 
     return NextResponse.json({ ok: true, booking });
   } catch (error) {
