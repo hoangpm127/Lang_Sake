@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { DateTimePicker } from "@/components/ui/datetime-picker";
 
 type BookingFormData = {
   customerName: string;
@@ -72,6 +74,7 @@ export default function BookingForm({ userId, onSuccess }: { userId?: string; on
       }
 
       setSuccess(true);
+      toast.success("Đặt bàn thành công!");
       
       // Call onSuccess callback if provided
       if (onSuccess) {
@@ -89,7 +92,9 @@ export default function BookingForm({ userId, onSuccess }: { userId?: string; on
         }, 2000);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Đặt bàn thất bại");
+      const errorMsg = err instanceof Error ? err.message : "Đặt bàn thất bại";
+      setError(errorMsg);
+      toast.error(errorMsg);
     } finally {
       setIsSubmitting(false);
     }
@@ -179,18 +184,11 @@ export default function BookingForm({ userId, onSuccess }: { userId?: string; on
         </div>
 
         {/* Thời gian */}
-        <div>
-          <label className="block text-sm font-medium text-[#1a1a1a] mb-2">
-            Thời gian đặt bàn <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="datetime-local"
-            required
+        <div className="md:col-span-2">
+          <DateTimePicker
+            label="Thời gian đặt bàn"
             value={formData.dateTime}
-            onChange={(e) =>
-              setFormData({ ...formData, dateTime: e.target.value })
-            }
-            className="w-full rounded-xl border border-black/10 bg-white px-4 py-3 text-sm text-[#1a1a1a] outline-none focus:border-[#c9a24d] transition"
+            onChange={(value) => setFormData({ ...formData, dateTime: value })}
           />
         </div>
 

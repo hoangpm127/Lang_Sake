@@ -1,5 +1,7 @@
 ﻿import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { verifyPassword } from "@/lib/auth";
+import { loginSchema } from "@/lib/validations";
 
 type LoginPayload = {
   email?: string;
@@ -12,16 +14,23 @@ const normalize = (value: string | undefined) => (value ?? "").trim();
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as LoginPayload;
-    const email = normalize(body.email);
-    const password = normalize(body.password);
     const requestedScope = normalize(body.requested_scope);
 
-    if (!email || !password) {
+    // Validate with Zod
+    const validation = loginSchema.safeParse({
+      email: body.email,
+      password: body.password,
+    });
+
+    if (!validation.success) {
+      const errors = validation.error.issues.map((issue) => issue.message).join(", ");
       return NextResponse.json(
-        { ok: false, message: "Thiếu thông tin đăng nhập." },
+        { ok: false, message: errors },
         { status: 400 }
       );
     }
+
+    const { email, password } = validation.data;
 
     // Tìm user theo email
     const user = await prisma.user.findUnique({
@@ -43,9 +52,9 @@ export async function POST(request: Request) {
       );
     }
 
-    // TODO: Implement password hashing (bcrypt) sau
-    // Tạm thời so sánh plain text
-    if (user.password !== password) {
+    // Verify password with bcrypt
+    const isPasswordValid = await verifyPassword(password, user.password);
+    if (!isPasswordValid) {
       return NextResponse.json(
         { ok: false, message: "Mật khẩu không chính xác." },
         { status: 401 }

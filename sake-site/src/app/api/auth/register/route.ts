@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { hashPassword } from "@/lib/auth";
+import { registerSchema } from "@/lib/validations";
 
 type RegisterPayload = {
   email?: string;
@@ -13,19 +15,24 @@ export async function POST(request: Request) {
   try {
     const body = (await request.json()) as RegisterPayload;
     
-    const email = (body.email ?? "").trim().toLowerCase();
-    const password = (body.password ?? "").trim();
-    const name = (body.name ?? "").trim();
-    const phone = (body.phone ?? "").trim();
-    const referralCode = (body.referralCode ?? "").trim();
+    // Validate with Zod
+    const validation = registerSchema.safeParse({
+      email: body.email,
+      password: body.password,
+      name: body.name,
+      phone: body.phone,
+    });
 
-    // Validate
-    if (!email || !password || !name || !phone) {
+    if (!validation.success) {
+      const errors = validation.error.issues.map((issue) => issue.message).join(", ");
       return NextResponse.json(
-        { ok: false, message: "Thiếu thông tin đăng ký." },
+        { ok: false, message: errors },
         { status: 400 }
       );
     }
+
+    const { email, password, name, phone } = validation.data;
+    const referralCode = (body.referralCode ?? "").trim();
 
     // Check email exists
     const existingUser = await prisma.user.findUnique({
@@ -66,11 +73,14 @@ export async function POST(request: Request) {
     // Generate unique referral code for new user
     const newReferralCode = `F2${Date.now().toString(36).toUpperCase()}`;
 
+    // Hash password
+    const hashedPassword = await hashPassword(password);
+
     // Create new F2 member
     const newUser = await prisma.user.create({
       data: {
         email,
-        password, // TODO: Hash with bcrypt
+        password: hashedPassword,
         name,
         phone,
         role: "F2_MEMBER",

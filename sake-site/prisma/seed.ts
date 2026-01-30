@@ -1,4 +1,5 @@
 import { PrismaClient } from "@prisma/client";
+import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
@@ -10,12 +11,18 @@ async function main() {
   await prisma.booking.deleteMany();
   await prisma.user.deleteMany();
 
+  // Hash passwords
+  const hashedAdminPassword = await bcrypt.hash("admin123", 10);
+  const hashedPartnerPassword = await bcrypt.hash("partner123", 10);
+  const hashedMemberPassword = await bcrypt.hash("member123", 10);
+  const hashedCustomerPassword = await bcrypt.hash("customer123", 10);
+
   // 1. Tạo Admin
   const admin = await prisma.user.create({
     data: {
       email: "admin@langsake.vn",
       phone: "0901234567",
-      password: "admin123", // TODO: Hash password sau
+      password: hashedAdminPassword,
       name: "Admin Lang Sake",
       role: "ADMIN",
     },
@@ -27,7 +34,7 @@ async function main() {
     data: {
       email: "partner1@company.com",
       phone: "0912345678",
-      password: "partner123",
+      password: hashedPartnerPassword,
       name: "Công ty ABC",
       role: "F1_PARTNER",
       referralCode: "PARTNER001",
@@ -40,7 +47,7 @@ async function main() {
     data: {
       email: "partner2@company.com",
       phone: "0923456789",
-      password: "partner123",
+      password: hashedPartnerPassword,
       name: "Công ty XYZ",
       role: "F1_PARTNER",
       referralCode: "PARTNER002",
@@ -55,7 +62,7 @@ async function main() {
     data: {
       email: "member1@gmail.com",
       phone: "0934567890",
-      password: "member123",
+      password: hashedMemberPassword,
       name: "Nguyễn Văn A",
       role: "F2_MEMBER",
       referralCode: "MEMBER001",
@@ -70,7 +77,7 @@ async function main() {
     data: {
       email: "member2@gmail.com",
       phone: "0945678901",
-      password: "member123",
+      password: hashedMemberPassword,
       name: "Trần Thị B",
       role: "F2_MEMBER",
       referralCode: "MEMBER002",
@@ -87,7 +94,7 @@ async function main() {
     data: {
       email: "customer1@gmail.com",
       phone: "0956789012",
-      password: "customer123",
+      password: hashedCustomerPassword,
       name: "Lê Văn C",
       role: "CUSTOMER",
     },

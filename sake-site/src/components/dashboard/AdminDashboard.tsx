@@ -1,6 +1,9 @@
 ﻿"use client";
 
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { FaCheck, FaTimes, FaClock, FaCheckCircle, FaTimesCircle } from "react-icons/fa";
 
 type Booking = {
   id: string;
@@ -60,6 +63,17 @@ export default function AdminDashboard() {
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [filterSource, setFilterSource] = useState<string>("all");
   const [updating, setUpdating] = useState<string | null>(null);
+  
+  // Confirm dialog state
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    bookingId: string | null;
+    action: "confirm" | "cancel" | "complete" | null;
+  }>({
+    isOpen: false,
+    bookingId: null,
+    action: null,
+  });
 
   useEffect(() => {
     fetchBookings();
@@ -99,14 +113,33 @@ export default function AdminDashboard() {
         setBookings((prev) =>
           prev.map((b) => (b.id === bookingId ? { ...b, status: newStatus } : b))
         );
+        toast.success("Cập nhật trạng thái thành công!");
       } else {
-        alert("Lỗi: " + data.message);
+        toast.error("Lỗi: " + data.message);
       }
     } catch (err) {
-      alert("Lỗi khi cập nhật booking");
+      toast.error("Lỗi khi cập nhật booking");
     } finally {
       setUpdating(null);
     }
+  };
+
+  const handleConfirmAction = async () => {
+    const { bookingId, action } = confirmDialog;
+    if (!bookingId || !action) return;
+
+    const statusMap = {
+      confirm: "CONFIRMED",
+      complete: "COMPLETED",
+      cancel: "CANCELLED",
+    };
+
+    await updateBookingStatus(bookingId, statusMap[action]);
+    setConfirmDialog({ isOpen: false, bookingId: null, action: null });
+  };
+
+  const openConfirmDialog = (bookingId: string, action: "confirm" | "cancel" | "complete") => {
+    setConfirmDialog({ isOpen: true, bookingId, action });
   };
 
   const calculateStats = (): Stats => {
@@ -458,29 +491,37 @@ export default function AdminDashboard() {
                         {booking.status === "PENDING" && (
                           <>
                             <button 
-                              onClick={() => updateBookingStatus(booking.id, "CONFIRMED")}
+                              onClick={() => openConfirmDialog(booking.id, "confirm")}
                               disabled={updating === booking.id}
-                              className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition disabled:opacity-50"
+                              className="p-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-50 flex items-center gap-1"
+                              title="Xác nhận booking"
                             >
-                              {updating === booking.id ? "..." : "Xác nhận"}
+                              <FaCheck /> Xác nhận
                             </button>
                             <button 
-                              onClick={() => updateBookingStatus(booking.id, "CANCELLED")}
+                              onClick={() => openConfirmDialog(booking.id, "cancel")}
                               disabled={updating === booking.id}
-                              className="px-3 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 transition disabled:opacity-50"
+                              className="p-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition disabled:opacity-50 flex items-center gap-1"
+                              title="Hủy booking"
                             >
-                              {updating === booking.id ? "..." : "Hủy"}
+                              <FaTimes /> Hủy
                             </button>
                           </>
                         )}
                         {booking.status === "CONFIRMED" && (
                           <button 
-                            onClick={() => updateBookingStatus(booking.id, "COMPLETED")}
+                            onClick={() => openConfirmDialog(booking.id, "complete")}
                             disabled={updating === booking.id}
-                            className="px-3 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 transition disabled:opacity-50"
+                            className="p-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50 flex items-center gap-1"
+                            title="Hoàn thành booking"
                           >
-                            {updating === booking.id ? "..." : "Hoàn thành"}
+                            <FaCheckCircle /> Hoàn thành
                           </button>
+                        )}
+                        {(booking.status === "COMPLETED" || booking.status === "CANCELLED") && (
+                          <span className="text-xs text-gray-400 italic">
+                            Đã xử lý
+                          </span>
                         )}
                       </div>
                     </td>
@@ -492,6 +533,36 @@ export default function AdminDashboard() {
           </table>
         </div>
       </div>
+
+      {/* Confirm Dialog */}
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog({ isOpen: false, bookingId: null, action: null })}
+        onConfirm={handleConfirmAction}
+        title={
+          confirmDialog.action === "confirm"
+            ? "Xác nhận booking?"
+            : confirmDialog.action === "complete"
+            ? "Hoàn thành booking?"
+            : "Hủy booking?"
+        }
+        description={
+          confirmDialog.action === "confirm"
+            ? "Bạn có chắc chắn muốn xác nhận booking này? Khách hàng sẽ nhận được thông báo."
+            : confirmDialog.action === "complete"
+            ? "Đánh dấu booking này là đã hoàn thành?"
+            : "Bạn có chắc chắn muốn hủy booking này? Hành động này không thể hoàn tác."
+        }
+        confirmText={
+          confirmDialog.action === "confirm"
+            ? "Xác nhận"
+            : confirmDialog.action === "complete"
+            ? "Hoàn thành"
+            : "Hủy booking"
+        }
+        variant={confirmDialog.action === "cancel" ? "danger" : "info"}
+        isLoading={updating !== null}
+      />
     </div>
   );
 }

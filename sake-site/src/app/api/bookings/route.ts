@@ -1,6 +1,7 @@
 ﻿import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/db";
+import { createBookingSchema } from "@/lib/validations";
 
 type BookingPayload = {
   customerName?: string;
@@ -48,30 +49,42 @@ export async function POST(request: Request) {
 
     const payload = (await request.json()) as BookingPayload;
 
-    const customerName = (payload.customerName ?? "").trim();
-    const phone = (payload.phone ?? "").trim();
-    const email = (payload.email ?? "").trim() || undefined;
-    const dateTimeValue = payload.dateTime ? new Date(payload.dateTime) : null;
-    const guests = Math.max(1, Number(payload.guests ?? 1));
-    const comboName = (payload.comboName ?? "").trim();
-    const comboPrice = Math.max(0, Number(payload.comboPrice ?? 0));
-    const hasDeposit = Boolean(payload.hasDeposit);
-    const referralCode = (payload.referralCode ?? "").trim() || undefined;
-    const notes = (payload.notes ?? "").trim() || undefined;
+    // Validate with Zod
+    const validation = createBookingSchema.safeParse({
+      customerName: payload.customerName,
+      phone: payload.phone,
+      email: payload.email,
+      dateTime: payload.dateTime,
+      guests: payload.guests,
+      comboName: payload.comboName,
+      comboPrice: payload.comboPrice,
+      hasDeposit: payload.hasDeposit,
+      referralCode: payload.referralCode,
+      notes: payload.notes,
+    });
 
-    if (
-      !customerName ||
-      !phone ||
-      !dateTimeValue ||
-      !comboName ||
-      !comboPrice
-    ) {
+    if (!validation.success) {
+      const errors = validation.error.issues.map((issue) => issue.message).join(", ");
       return NextResponse.json(
-        { ok: false, message: "Thiếu thông tin đặt lịch." },
+        { ok: false, message: errors },
         { status: 400 }
       );
     }
 
+    const {
+      customerName,
+      phone,
+      email,
+      dateTime,
+      guests,
+      comboName,
+      comboPrice,
+      hasDeposit,
+      referralCode,
+      notes,
+    } = validation.data;
+
+    const dateTimeValue = new Date(dateTime);
     const subtotal = Math.round(comboPrice * guests);
 
     // Tính discount nếu có referral code
@@ -84,7 +97,7 @@ export async function POST(request: Request) {
     const depositAmount = hasDeposit ? Math.round(finalTotal * 0.2) : 0;
 
     // Xác định source và customer
-    let source = "WEB_DIRECT"; // Default cho khách vãng lai
+    let source: "WEB_DIRECT" | "F2_SELF" = "WEB_DIRECT"; // Default cho khách vãng lai
     let customerId: string | undefined = undefined;
 
     // Chỉ F2 member mới có source khác

@@ -6,6 +6,7 @@ import {
   Playfair_Display,
 } from "next/font/google";
 import "./globals.css";
+import { ToastProvider } from "@/components/ui/toast-provider";
 
 const cormorant = Cormorant_Garamond({
   variable: "--font-cormorant",
@@ -48,6 +49,7 @@ export default function RootLayout({
       <body
         className={`${cormorant.variable} ${manrope.variable} ${pinyon.variable} ${playfair.variable} antialiased`}
       >
+        <ToastProvider />
         {children}
       </body>
     </html>
