@@ -135,11 +135,14 @@ export default function LoginPage() {
     const email = formState.email ?? "";
     const password = formState.password ?? "";
 
+    // Map UI role to requested_scope for strict validation
+    const requestedScope = role; // 'admin', 'f1', or 'f2'
+
     try {
       const response = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, requested_scope: requestedScope }),
       });
 
       const text = await response.text();

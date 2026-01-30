@@ -279,7 +279,7 @@ export default function BookingForm({ userId, onSuccess }: { userId?: string; on
           />
           <div>
             <p className="text-sm font-medium text-[#1a1a1a]">
-              Đặt cọc trước 20%
+              Đặt cọc trước 10%
             </p>
             <p className="text-xs text-[#8b857a] mt-1">
               Đặt cọc để đảm bảo chỗ và nhận ưu đãi
@@ -315,7 +315,7 @@ export default function BookingForm({ userId, onSuccess }: { userId?: string; on
             <div className="flex justify-between text-sm pt-1">
               <span className="text-[#8b857a]">Cần đặt cọc:</span>
               <span className="font-medium text-[#c9a24d]">
-                {Math.round(finalTotal * 0.2).toLocaleString("vi-VN")}₫
+                {Math.round(finalTotal * 0.1).toLocaleString("vi-VN")}₫
               </span>
             </div>
           )}

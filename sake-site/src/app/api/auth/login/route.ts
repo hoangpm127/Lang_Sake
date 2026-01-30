@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 type LoginPayload = {
   email?: string;
   password?: string;
+  requested_scope?: string; // 'admin', 'f1', 'f2', 'customer'
 };
 
 const normalize = (value: string | undefined) => (value ?? "").trim();
@@ -13,6 +14,7 @@ export async function POST(request: Request) {
     const body = (await request.json()) as LoginPayload;
     const email = normalize(body.email);
     const password = normalize(body.password);
+    const requestedScope = normalize(body.requested_scope);
 
     if (!email || !password) {
       return NextResponse.json(
@@ -65,6 +67,30 @@ export async function POST(request: Request) {
       case "CUSTOMER":
         roleRoute = "customer";
         break;
+    }
+
+    // STRICT SCOPE VALIDATION: User must login at the correct portal
+    if (requestedScope && requestedScope !== roleRoute) {
+      const portalNames: Record<string, string> = {
+        admin: "Quản trị viên",
+        f1: "Đối tác chiến lược",
+        f2: "Thành viên",
+        customer: "Khách hàng"
+      };
+      
+      const userPortal = portalNames[roleRoute] || roleRoute;
+      const requestedPortal = portalNames[requestedScope] || requestedScope;
+      
+      console.log(`[Login DENIED] User ${user.email} (${userPortal}) attempted login at ${requestedPortal} portal`);
+      
+      return NextResponse.json(
+        { 
+          ok: false, 
+          message: `Tài khoản này thuộc portal "${userPortal}". Vui lòng chọn đúng tab để đăng nhập.`,
+          correctPortal: roleRoute
+        },
+        { status: 403 }
+      );
     }
 
     console.log(`[Login] User: ${user.email}, DB Role: ${user.role}, Cookie Role: ${roleRoute}`);
