@@ -46,36 +46,137 @@ export default function BookingForm({ userId, onSuccess, isF1Creating }: { userI
   const [success, setSuccess] = useState(false);
   const [bookingDetails, setBookingDetails] = useState<any>(null);
   const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(null);
+  const [isCheckingPayment, setIsCheckingPayment] = useState(false);
+  const [pendingBookingId, setPendingBookingId] = useState<string | null>(null);
+  const [countdown, setCountdown] = useState<number>(0);
+  const [isPaid, setIsPaid] = useState(false);
 
-  // Generate QR code khi check deposit
+  // Countdown timer 15 phút
   useEffect(() => {
-    if (formData.hasDeposit && !success) {
-      generateQRCode();
-    } else {
+    if (countdown <= 0) return;
+    
+    const timer = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          toast.error('⏰ Hết thời gian thanh toán! Vui lòng đặt lại.');
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [countdown]);
+
+  // Tạo booking tạm khi tick đặt cọc
+  useEffect(() => {
+    if (formData.hasDeposit && !pendingBookingId && !success) {
+      createPendingBooking();
+    } else if (!formData.hasDeposit) {
+      setPendingBookingId(null);
       setQrCodeUrl(null);
+      setCountdown(0);
+      setIsPaid(false);
     }
   }, [formData.hasDeposit, success]);
 
-  const generateQRCode = async () => {
+  // Auto-check payment status khi có booking và cần thanh toán cọc
+  useEffect(() => {
+    if (!pendingBookingId || isPaid) {
+      return;
+    }
+
+    setIsCheckingPayment(true);
+    
+    // Check payment status mỗi 3 giây
+    const interval = setInterval(async () => {
+      try {
+        const response = await fetch(`/api/bookings/${pendingBookingId}`);
+        const data = await response.json();
+        
+        if (data.ok && data.booking) {
+          console.log('[Polling] Booking status:', {
+            depositPaid: data.booking.depositPaid,
+            status: data.booking.status,
+            bankRef: data.booking.paymentBankRef,
+          });
+          
+          // Nếu đã thanh toán, dừng polling và hiển thị thông báo
+          if (data.booking.depositPaid === true) {
+            clearInterval(interval);
+            setIsCheckingPayment(false);
+            setIsPaid(true);
+            toast.success('🎉 Thanh toán thành công! Bạn có thể xác nhận đặt bàn.', {
+              duration: 5000,
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Error checking payment status:', error);
+      }
+    }, 3000); // Check mỗi 3 giây
+
+    // Dừng sau 15 phút
+    const timeout = setTimeout(() => {
+      clearInterval(interval);
+      setIsCheckingPayment(false);
+      if (!isPaid) {
+        toast.error('⏰ Hết thời gian thanh toán!');
+      }
+    }, 900000); // 15 phút
+
+    return () => {
+      clearInterval(interval);
+      clearTimeout(timeout);
+    };
+  }, [pendingBookingId, isPaid]);
+
+  const createPendingBooking = async () => {
     try {
-      const depositAmount = Math.round(subtotal * 0.1);
+      // Validate form data trước
+      if (!formData.customerName || !formData.phone || !formData.dateTime) {
+        toast.error('Vui lòng điền đầy đủ thông tin trước khi chọn đặt cọc!');
+        setFormData({ ...formData, hasDeposit: false });
+        return;
+      }
+
+      const bodyData = isF1Creating 
+        ? { ...formData, isF1Creating: true, status: 'PENDING' }
+        : { ...formData, status: 'PENDING' };
+
+      const response = await fetch("/api/bookings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(bodyData),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.ok) {
+        throw new Error(data.message || "Tạo booking thất bại");
+      }
+
+      setPendingBookingId(data.booking.id);
+      setCountdown(900); // 15 phút = 900 giây
+      
+      // Generate QR code
+      const depositAmount = Math.round((formData.comboPrice * formData.guests) * 0.1);
       const source = formData.referralCode || 'WEB';
-      
-      // Tạm thời dùng booking ID giả để preview QR
-      // QR thực sẽ được generate sau khi booking được tạo
-      const tempBookingId = 'PREVIEW';
-      
-      const bankBin = process.env.NEXT_PUBLIC_BANK_BIN || '970436'; // Vietcombank
+      const bankBin = process.env.NEXT_PUBLIC_BANK_BIN || '970423';
       const accountNumber = process.env.NEXT_PUBLIC_BANK_ACCOUNT_NUMBER || '';
-      const accountName = process.env.NEXT_PUBLIC_BANK_ACCOUNT_NAME || 'LANG SAKE';
-      const transferContent = `LANGSAKE B${tempBookingId} ${source}`;
+      const accountName = process.env.NEXT_PUBLIC_BANK_ACCOUNT_NAME || 'MAI VIET HOANG';
+      const transferContent = `LANGSAKE B${data.booking.id.substring(0, 8)} ${source}`;
       
       const qrUrl = `https://img.vietqr.io/image/${bankBin}-${accountNumber}-compact.png?` +
         `amount=${depositAmount}&addInfo=${encodeURIComponent(transferContent)}&accountName=${encodeURIComponent(accountName)}`;
       
       setQrCodeUrl(qrUrl);
+      toast.success('📱 Vui lòng quét mã QR để thanh toán trong 15 phút!');
     } catch (error) {
-      console.error('Error generating QR code:', error);
+      console.error('Error creating pending booking:', error);
+      toast.error('Không thể tạo đơn đặt cọc. Vui lòng thử lại!');
+      setFormData({ ...formData, hasDeposit: false });
     }
   };
 
@@ -96,26 +197,45 @@ export default function BookingForm({ userId, onSuccess, isF1Creating }: { userI
     setError(null);
 
     try {
-      // Add isF1Creating flag to the request body
-      const bodyData = isF1Creating 
-        ? { ...formData, isF1Creating: true }
-        : formData;
+      // Nếu có pending booking (đã tạo khi đặt cọc), chỉ cần update status
+      if (pendingBookingId && isPaid) {
+        const response = await fetch(`/api/bookings/${pendingBookingId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: 'CONFIRMED' }),
+        });
 
-      const response = await fetch("/api/bookings", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(bodyData),
-      });
+        const data = await response.json();
 
-      const data = await response.json();
+        if (!response.ok || !data.ok) {
+          throw new Error(data.message || "Xác nhận đặt bàn thất bại");
+        }
 
-      if (!response.ok || !data.ok) {
-        throw new Error(data.message || "Đặt bàn thất bại");
+        setSuccess(true);
+        setBookingDetails(data.booking);
+        toast.success("Đặt bàn thành công!");
+      } else {
+        // Không có đặt cọc, tạo booking mới bình thường
+        const bodyData = isF1Creating 
+          ? { ...formData, isF1Creating: true }
+          : formData;
+
+        const response = await fetch("/api/bookings", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(bodyData),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok || !data.ok) {
+          throw new Error(data.message || "Đặt bàn thất bại");
+        }
+
+        setSuccess(true);
+        setBookingDetails(data.booking);
+        toast.success("Đặt bàn thành công!");
       }
-
-      setSuccess(true);
-      setBookingDetails(data.booking);
-      toast.success("Đặt bàn thành công!");
       
       // Call onSuccess callback if provided
       if (onSuccess) {
@@ -174,16 +294,38 @@ export default function BookingForm({ userId, onSuccess, isF1Creating }: { userI
     return (
       <div className="space-y-6">
         {/* Success Header */}
-        <div className="rounded-3xl border border-green-500/20 bg-gradient-to-br from-green-50 to-emerald-50 p-8 text-center">
-          <div className="text-6xl mb-4">🎉</div>
-          <h3 className="text-2xl font-serif text-green-800 mb-2">
-            Đặt bàn thành công!
+        <div className={`rounded-3xl border p-8 text-center transition-all ${
+          bookingDetails.paymentStatus === 'PAID' 
+            ? 'border-green-500/20 bg-gradient-to-br from-green-50 to-emerald-50'
+            : bookingDetails.depositAmount > 0
+            ? 'border-yellow-500/20 bg-gradient-to-br from-yellow-50 to-amber-50'
+            : 'border-green-500/20 bg-gradient-to-br from-green-50 to-emerald-50'
+        }`}>
+          <div className="text-6xl mb-4">
+            {bookingDetails.paymentStatus === 'PAID' ? '✅' : bookingDetails.depositAmount > 0 ? '⏳' : '🎉'}
+          </div>
+          <h3 className={`text-2xl font-serif mb-2 ${
+            bookingDetails.paymentStatus === 'PAID' ? 'text-green-800' : 'text-yellow-800'
+          }`}>
+            {bookingDetails.paymentStatus === 'PAID' 
+              ? 'Đã thanh toán thành công!' 
+              : bookingDetails.depositAmount > 0
+              ? 'Vui lòng thanh toán đặt cọc'
+              : 'Đặt bàn thành công!'}
           </h3>
-          <p className="text-green-700 mb-1">
-            Cảm ơn bạn đã tin tưởng Lang Sake
+          <p className={bookingDetails.paymentStatus === 'PAID' ? 'text-green-700 mb-1' : 'text-yellow-700 mb-1'}>
+            {bookingDetails.paymentStatus === 'PAID'
+              ? 'Cảm ơn bạn đã hoàn tất thanh toán!'
+              : bookingDetails.depositAmount > 0
+              ? 'Quét mã QR bên dưới để thanh toán'
+              : 'Cảm ơn bạn đã tin tưởng Lang Sake'}
           </p>
-          <p className="text-sm text-green-600">
-            Chúng tôi sẽ liên hệ xác nhận trong thời gian sớm nhất
+          <p className={`text-sm ${bookingDetails.paymentStatus === 'PAID' ? 'text-green-600' : 'text-yellow-600'}`}>
+            {bookingDetails.paymentStatus === 'PAID'
+              ? 'Đặt bàn của bạn đã được xác nhận'
+              : bookingDetails.depositAmount > 0 && isCheckingPayment
+              ? '🔄 Đang chờ xác nhận thanh toán...'
+              : 'Chúng tôi sẽ liên hệ xác nhận trong thời gian sớm nhất'}
           </p>
         </div>
 
@@ -241,14 +383,89 @@ export default function BookingForm({ userId, onSuccess, isF1Creating }: { userI
                 <span className="text-xl font-bold text-[#c9a24d]">{formatCurrency(bookingDetails.finalTotal)}</span>
               </div>
               {bookingDetails.depositAmount > 0 && (
-                <div className="flex justify-between items-center mt-2">
-                  <span className="text-sm text-green-700">Đã đặt cọc:</span>
-                  <span className="text-lg font-semibold text-green-700">{formatCurrency(bookingDetails.depositAmount)}</span>
+                <div className={`flex justify-between items-center mt-2 ${
+                  bookingDetails.paymentStatus === 'PAID' ? 'text-green-700' : 'text-yellow-700'
+                }`}>
+                  <span className="text-sm">
+                    {bookingDetails.paymentStatus === 'PAID' ? '✅ Đã thanh toán cọc:' : '⏳ Cần thanh toán cọc:'}
+                  </span>
+                  <span className="text-lg font-semibold">{formatCurrency(bookingDetails.depositAmount)}</span>
                 </div>
               )}
             </div>
           </div>
         </div>
+
+        {/* QR Code - Hiển thị nếu chưa thanh toán */}
+        {bookingDetails.depositAmount > 0 && bookingDetails.paymentStatus !== 'PAID' && (
+          <div className="rounded-2xl border-2 border-[#c9a24d] bg-gradient-to-br from-amber-50 to-yellow-50 p-6">
+            <div className="text-center space-y-4">
+              <h4 className="text-lg font-semibold text-[#1a1a1a]">
+                💳 Quét mã QR để thanh toán
+              </h4>
+              <p className="text-sm text-[#8b857a]">
+                Chuyển khoản đúng nội dung để tự động xác nhận
+              </p>
+              
+              <div className="flex justify-center">
+                <div className="relative w-64 h-64 border-2 border-[#c9a24d]/20 rounded-lg overflow-hidden bg-white">
+                  {(() => {
+                    const bankBin = process.env.NEXT_PUBLIC_BANK_BIN || '970423';
+                    const accountNumber = process.env.NEXT_PUBLIC_BANK_ACCOUNT_NUMBER || '';
+                    const accountName = process.env.NEXT_PUBLIC_BANK_ACCOUNT_NAME || 'MAI VIET HOANG';
+                    const source = bookingDetails.referralCode || 'WEB';
+                    const transferContent = `LANGSAKE B${bookingDetails.id.substring(0, 8)} ${source}`;
+                    const qrUrl = `https://img.vietqr.io/image/${bankBin}-${accountNumber}-compact.png?` +
+                      `amount=${bookingDetails.depositAmount}&addInfo=${encodeURIComponent(transferContent)}&accountName=${encodeURIComponent(accountName)}`;
+                    
+                    return (
+                      <Image
+                        src={qrUrl}
+                        alt="QR Code thanh toán"
+                        fill
+                        className="object-contain p-4"
+                      />
+                    );
+                  })()}
+                </div>
+              </div>
+
+              <div className="bg-white rounded-lg p-4 border border-[#c9a24d]/20">
+                <div className="space-y-2 text-sm text-left">
+                  <div className="flex justify-between">
+                    <span className="text-[#8b857a]">Số tiền:</span>
+                    <span className="font-semibold text-[#c9a24d]">{formatCurrency(bookingDetails.depositAmount)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-[#8b857a]">Nội dung:</span>
+                    <button
+                      onClick={() => {
+                        const source = bookingDetails.referralCode || 'WEB';
+                        const content = `LANGSAKE B${bookingDetails.id.substring(0, 8)} ${source}`;
+                        navigator.clipboard.writeText(content);
+                        toast.success('Đã copy nội dung chuyển khoản!');
+                      }}
+                      className="font-mono font-semibold text-[#c9a24d] hover:underline"
+                    >
+                      LANGSAKE B{bookingDetails.id.substring(0, 8)} {bookingDetails.referralCode || 'WEB'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {isCheckingPayment && (
+                <div className="flex items-center justify-center gap-2 text-sm text-blue-600">
+                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-600 border-t-transparent"></div>
+                  <span>Đang kiểm tra thanh toán tự động...</span>
+                </div>
+              )}
+
+              <p className="text-xs text-[#8b857a]">
+                ⚡ Tự động xác nhận trong vòng 30 giây sau khi chuyển khoản thành công
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Instructions */}
         <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
@@ -454,6 +671,44 @@ export default function BookingForm({ userId, onSuccess, isF1Creating }: { userI
         {formData.hasDeposit && qrCodeUrl && (
           <div className="mt-4 pt-4 border-t border-black/10">
             <div className="bg-white rounded-xl p-4 shadow-sm">
+              {/* Countdown Timer */}
+              {countdown > 0 && (
+                <div className="mb-3 text-center">
+                  <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg ${
+                    countdown < 300 ? 'bg-red-50 text-red-700' : 'bg-blue-50 text-blue-700'
+                  }`}>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span className="font-mono font-semibold">
+                      {Math.floor(countdown / 60).toString().padStart(2, '0')}:{(countdown % 60).toString().padStart(2, '0')}
+                    </span>
+                    <span className="text-xs">phút</span>
+                  </div>
+                  <p className="text-xs text-[#8b857a] mt-1">
+                    {countdown < 300 ? '⚠️ Sắp hết thời gian thanh toán!' : 'Thời gian còn lại để thanh toán'}
+                  </p>
+                </div>
+              )}
+
+              {/* Payment Status */}
+              {isPaid && (
+                <div className="mb-3 bg-green-50 border border-green-200 rounded-lg p-3 text-center">
+                  <div className="text-2xl mb-1">✅</div>
+                  <p className="text-sm font-semibold text-green-800">Đã thanh toán thành công!</p>
+                  <p className="text-xs text-green-600 mt-1">Bạn có thể xác nhận đặt bàn ngay</p>
+                </div>
+              )}
+
+              {isCheckingPayment && !isPaid && (
+                <div className="mb-3 bg-blue-50 border border-blue-200 rounded-lg p-3 text-center">
+                  <div className="flex items-center justify-center gap-2 text-blue-700">
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-600 border-t-transparent"></div>
+                    <span className="text-sm">Đang chờ thanh toán...</span>
+                  </div>
+                </div>
+              )}
+
               <div className="text-center mb-3">
                 <p className="text-sm font-semibold text-[#c9a24d] mb-1">
                   💳 Quét mã QR để thanh toán cọc
@@ -461,6 +716,20 @@ export default function BookingForm({ userId, onSuccess, isF1Creating }: { userI
                 <p className="text-xs text-[#8b857a]">
                   Số tiền: <span className="font-medium text-[#c9a24d]">{Math.round(subtotal * 0.1).toLocaleString("vi-VN")}₫</span>
                 </p>
+                {pendingBookingId && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const source = formData.referralCode || 'WEB';
+                      const content = `LANGSAKE B${pendingBookingId.substring(0, 8)} ${source}`;
+                      navigator.clipboard.writeText(content);
+                      toast.success('Đã copy nội dung chuyển khoản!');
+                    }}
+                    className="mt-1 text-xs text-blue-600 hover:underline"
+                  >
+                    📋 Copy nội dung CK: LANGSAKE B{pendingBookingId.substring(0, 8)} {formData.referralCode || 'WEB'}
+                  </button>
+                )}
               </div>
               
               <div className="flex justify-center mb-3">
@@ -480,7 +749,7 @@ export default function BookingForm({ userId, onSuccess, isF1Creating }: { userI
                   <li>Mở app banking và quét mã QR</li>
                   <li>Kiểm tra số tiền và nội dung chuyển khoản</li>
                   <li>Xác nhận thanh toán</li>
-                  <li>Hệ thống tự động xác nhận sau khi nhận tiền</li>
+                  <li>Hệ thống tự động xác nhận trong 30 giây</li>
                 </ul>
               </div>
 
@@ -539,11 +808,27 @@ export default function BookingForm({ userId, onSuccess, isF1Creating }: { userI
       {/* Submit button */}
       <button
         type="submit"
-        disabled={isSubmitting}
-        className="w-full rounded-xl bg-[#c9a24d] px-8 py-4 text-sm font-medium text-white transition hover:bg-[#b89043] disabled:opacity-50 disabled:cursor-not-allowed"
+        disabled={isSubmitting || (formData.hasDeposit && !isPaid)}
+        className={`w-full rounded-xl px-8 py-4 text-sm font-medium text-white transition ${
+          formData.hasDeposit && !isPaid
+            ? 'bg-gray-400 cursor-not-allowed'
+            : 'bg-[#c9a24d] hover:bg-[#b89043]'
+        } disabled:opacity-50`}
       >
-        {isSubmitting ? "Đang xử lý..." : "Xác nhận đặt bàn"}
+        {isSubmitting 
+          ? "Đang xử lý..." 
+          : formData.hasDeposit && !isPaid
+          ? "🔒 Vui lòng thanh toán cọc để tiếp tục"
+          : isPaid
+          ? "✅ Xác nhận đặt bàn (Đã thanh toán)"
+          : "Xác nhận đặt bàn"}
       </button>
+
+      {formData.hasDeposit && !isPaid && (
+        <div className="text-center text-xs text-yellow-700 bg-yellow-50 rounded-lg p-2">
+          ⏳ Nút đặt bàn sẽ mở sau khi thanh toán cọc thành công
+        </div>
+      )}
 
       <p className="text-xs text-center text-[#8b857a]">
         Bằng việc đặt bàn, bạn đồng ý với{" "}

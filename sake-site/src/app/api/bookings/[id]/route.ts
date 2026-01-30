@@ -11,16 +11,10 @@ export async function GET(
   try {
     const { id } = await context.params;
     
+    // Allow public access for booking lookup
     const cookieStore = await cookies();
     const roleFromCookie = cookieStore.get("sake_role")?.value;
     const userIdFromCookie = cookieStore.get("sake_user_id")?.value;
-
-    if (!roleFromCookie || !userIdFromCookie) {
-      return NextResponse.json(
-        { ok: false, message: "Unauthorized" },
-        { status: 401 }
-      );
-    }
 
     const booking = await prisma.booking.findUnique({
       where: { id },
@@ -52,16 +46,19 @@ export async function GET(
       );
     }
 
-    // Check permissions
-    if (roleFromCookie !== "admin") {
-      // F1/F2/Customer can only see their own bookings
-      if (booking.customerId !== userIdFromCookie && booking.createdById !== userIdFromCookie) {
-        return NextResponse.json(
-          { ok: false, message: "Forbidden" },
-          { status: 403 }
-        );
+    // Check permissions - only if authenticated
+    if (roleFromCookie && userIdFromCookie) {
+      if (roleFromCookie !== "admin") {
+        // F1/F2/Customer can only see their own bookings
+        if (booking.customerId !== userIdFromCookie && booking.createdById !== userIdFromCookie) {
+          return NextResponse.json(
+            { ok: false, message: "Forbidden" },
+            { status: 403 }
+          );
+        }
       }
     }
+    // If not authenticated, still return booking for public lookup
 
     return NextResponse.json({ ok: true, booking });
   } catch (error) {
@@ -73,7 +70,7 @@ export async function GET(
   }
 }
 
-// PUT /api/bookings/[id] - Update booking (Admin only)
+// PUT /api/bookings/[id] - Update booking
 export async function PUT(
   request: NextRequest,
   context: { params: Promise<{ id: string }> }
@@ -84,14 +81,38 @@ export async function PUT(
     const cookieStore = await cookies();
     const roleFromCookie = cookieStore.get("sake_role")?.value;
 
+    const body = await request.json();
+
+    // Allow simple status update from pending booking confirmation
+    if (body.status && Object.keys(body).length === 1) {
+      const booking = await prisma.booking.update({
+        where: { id },
+        data: { status: body.status },
+        include: {
+          customer: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              phone: true,
+            },
+          },
+        },
+      });
+
+      return NextResponse.json({
+        ok: true,
+        booking,
+      });
+    }
+
+    // Full update requires admin
     if (roleFromCookie !== "admin") {
       return NextResponse.json(
         { ok: false, message: "Unauthorized - Admin only" },
         { status: 403 }
       );
     }
-
-    const body = await request.json();
 
     // Validate with Zod
     const validation = updateBookingSchema.safeParse(body);

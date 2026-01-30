@@ -73,31 +73,57 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.text();
     const signature = request.headers.get('x-signature') || '';
-    const provider = request.headers.get('x-provider') || 'casso'; // 'casso' hoặc 'sepay'
-
-    console.log('[Webhook] Received payment webhook', {
-      provider,
-      hasSignature: !!signature,
-      bodyLength: body.length,
+    
+    console.log('[Webhook] ========== NEW WEBHOOK RECEIVED ==========');
+    console.log('[Webhook] Headers:', {
+      signature: signature ? 'present' : 'none',
+      contentType: request.headers.get('content-type'),
+      userAgent: request.headers.get('user-agent'),
     });
-
-    // Xác thực chữ ký
-    let isValid = false;
-    if (provider === 'casso') {
-      isValid = verifyCassoSignature(body, signature);
-    } else if (provider === 'sepay') {
-      isValid = verifySepaySignature(body, signature);
-    }
-
-    if (!isValid && process.env.NODE_ENV === 'production') {
-      console.error('[Webhook] Invalid signature');
-      return NextResponse.json(
-        { error: 'Invalid signature' },
-        { status: 401 }
-      );
-    }
+    console.log('[Webhook] Body:', body.substring(0, 500));
 
     const data = JSON.parse(body);
+    
+    // Auto-detect provider dựa trên payload structure
+    let provider = request.headers.get('x-provider') || '';
+    if (!provider) {
+      if (data.gateway || data.transferAmount !== undefined || data.transactionDate) {
+        provider = 'sepay';
+      } else if (data.data || data.when) {
+        provider = 'casso';
+      } else {
+        provider = 'unknown';
+      }
+    }
+    
+    console.log('[Webhook] Detected provider:', provider);
+
+    // Xác thực chữ ký (nếu có secret)
+    let isValid = false;
+    const hasSecret = provider === 'casso' 
+      ? process.env.CASSO_WEBHOOK_SECRET && process.env.CASSO_WEBHOOK_SECRET.trim() !== ''
+      : process.env.SEPAY_WEBHOOK_SECRET && process.env.SEPAY_WEBHOOK_SECRET.trim() !== '';
+
+    if (hasSecret && signature) {
+      if (provider === 'casso') {
+        isValid = verifyCassoSignature(body, signature);
+      } else if (provider === 'sepay') {
+        isValid = verifySepaySignature(body, signature);
+      }
+
+      if (!isValid && process.env.NODE_ENV === 'production') {
+        console.error('[Webhook] Invalid signature');
+        return NextResponse.json(
+          { error: 'Invalid signature' },
+          { status: 401 }
+        );
+      }
+      console.log('[Webhook] Signature verified:', isValid);
+    } else {
+      // Không có secret - bỏ qua verification (dùng cho No_Authen mode)
+      console.log('[Webhook] ⚠️ No secret or signature - skipping verification (No_Authen mode)');
+      isValid = true;
+    }
 
     // Xử lý Casso webhook
     if (provider === 'casso') {
@@ -119,16 +145,41 @@ export async function POST(request: NextRequest) {
     
     // Xử lý Sepay webhook
     else if (provider === 'sepay') {
-      const transactions: SepayTransaction[] = data.transactions || [data];
+      // Sepay có thể gửi single object hoặc array
+      let transactions: SepayTransaction[];
+      if (Array.isArray(data)) {
+        transactions = data;
+      } else if (data.transactions && Array.isArray(data.transactions)) {
+        transactions = data.transactions;
+      } else if (data.gateway || data.transferAmount !== undefined) {
+        // Single transaction object
+        transactions = [data];
+      } else {
+        console.error('[Webhook] Unknown Sepay format:', data);
+        transactions = [];
+      }
+      
+      console.log('[Webhook] Processing', transactions.length, 'Sepay transaction(s)');
       
       for (const tx of transactions) {
+        console.log('[Webhook] Transaction:', {
+          gateway: tx.gateway,
+          amount: tx.transferAmount,
+          type: tx.transferType,
+          content: tx.content,
+          code: tx.referenceCode || tx.code,
+        });
+        
         // Chỉ xử lý giao dịch tiền vào (transferType = "in")
-        if (tx.transferType !== 'in') continue;
+        if (tx.transferType !== 'in') {
+          console.log('[Webhook] Skipping non-incoming transaction');
+          continue;
+        }
         
         await processTransaction({
           amount: tx.transferAmount,
           description: tx.content,
-          bankRef: tx.referenceCode,
+          bankRef: tx.referenceCode || (tx as any).code || '',
           provider: 'sepay',
           rawData: tx,
         });
@@ -168,6 +219,30 @@ async function processTransaction(params: {
     provider,
   });
 
+  // LOG TEST PAYMENTS (cho test-payment page)
+  if (description.includes('TEST')) {
+    const fs = require('fs');
+    const path = require('path');
+    const logFile = path.join(process.cwd(), 'test-payments.json');
+    
+    let logs: any[] = [];
+    if (fs.existsSync(logFile)) {
+      logs = JSON.parse(fs.readFileSync(logFile, 'utf-8'));
+    }
+    
+    logs.push({
+      timestamp: new Date().toISOString(),
+      amount,
+      transferContent: description,
+      bankRef,
+      provider,
+      rawData,
+    });
+    
+    fs.writeFileSync(logFile, JSON.stringify(logs, null, 2));
+    console.log('[Webhook] ✅ Test payment logged to test-payments.json');
+  }
+
   // Parse nội dung chuyển khoản để lấy booking ID
   const parsed = parseTransferContent(description);
   
@@ -178,10 +253,28 @@ async function processTransaction(params: {
 
   console.log('[Webhook] Found booking ID:', parsed.bookingId);
 
-  // Tìm booking
-  const booking = await prisma.booking.findUnique({
+  // Tìm booking - hỗ trợ cả full ID và partial ID (8 ký tự đầu)
+  let booking = await prisma.booking.findUnique({
     where: { id: parsed.bookingId },
   });
+
+  // Nếu không tìm thấy bằng full ID, thử tìm bằng partial ID
+  if (!booking && parsed.bookingId.length >= 8) {
+    const bookings = await prisma.booking.findMany({
+      where: {
+        id: {
+          startsWith: parsed.bookingId.substring(0, 12), // Lấy 12 ký tự đầu
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 1,
+    });
+    
+    if (bookings.length > 0) {
+      booking = bookings[0];
+      console.log('[Webhook] Found booking by partial ID:', booking.id);
+    }
+  }
 
   if (!booking) {
     console.error('[Webhook] Booking not found:', parsed.bookingId);
