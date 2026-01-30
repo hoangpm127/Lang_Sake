@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { DateTimePicker } from "@/components/ui/datetime-picker";
+import Image from "next/image";
 
 type BookingFormData = {
   customerName: string;
@@ -44,6 +45,39 @@ export default function BookingForm({ userId, onSuccess, isF1Creating }: { userI
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [bookingDetails, setBookingDetails] = useState<any>(null);
+  const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(null);
+
+  // Generate QR code khi check deposit
+  useEffect(() => {
+    if (formData.hasDeposit && !success) {
+      generateQRCode();
+    } else {
+      setQrCodeUrl(null);
+    }
+  }, [formData.hasDeposit, success]);
+
+  const generateQRCode = async () => {
+    try {
+      const depositAmount = Math.round(subtotal * 0.1);
+      const source = formData.referralCode || 'WEB';
+      
+      // Tạm thời dùng booking ID giả để preview QR
+      // QR thực sẽ được generate sau khi booking được tạo
+      const tempBookingId = 'PREVIEW';
+      
+      const bankBin = process.env.NEXT_PUBLIC_BANK_BIN || '970436'; // Vietcombank
+      const accountNumber = process.env.NEXT_PUBLIC_BANK_ACCOUNT_NUMBER || '';
+      const accountName = process.env.NEXT_PUBLIC_BANK_ACCOUNT_NAME || 'LANG SAKE';
+      const transferContent = `LANGSAKE B${tempBookingId} ${source}`;
+      
+      const qrUrl = `https://img.vietqr.io/image/${bankBin}-${accountNumber}-compact.png?` +
+        `amount=${depositAmount}&addInfo=${encodeURIComponent(transferContent)}&accountName=${encodeURIComponent(accountName)}`;
+      
+      setQrCodeUrl(qrUrl);
+    } catch (error) {
+      console.error('Error generating QR code:', error);
+    }
+  };
 
   const handleComboChange = (comboName: string) => {
     const combo = COMBOS.find((c) => c.name === comboName);
@@ -415,6 +449,49 @@ export default function BookingForm({ userId, onSuccess, isF1Creating }: { userI
             </p>
           </div>
         </label>
+
+        {/* QR Code hiển thị khi check deposit */}
+        {formData.hasDeposit && qrCodeUrl && (
+          <div className="mt-4 pt-4 border-t border-black/10">
+            <div className="bg-white rounded-xl p-4 shadow-sm">
+              <div className="text-center mb-3">
+                <p className="text-sm font-semibold text-[#c9a24d] mb-1">
+                  💳 Quét mã QR để thanh toán cọc
+                </p>
+                <p className="text-xs text-[#8b857a]">
+                  Số tiền: <span className="font-medium text-[#c9a24d]">{Math.round(subtotal * 0.1).toLocaleString("vi-VN")}₫</span>
+                </p>
+              </div>
+              
+              <div className="flex justify-center mb-3">
+                <div className="relative w-48 h-48 border-2 border-[#c9a24d]/20 rounded-lg overflow-hidden">
+                  <Image
+                    src={qrCodeUrl}
+                    alt="QR Code thanh toán"
+                    fill
+                    className="object-contain p-2"
+                  />
+                </div>
+              </div>
+
+              <div className="bg-blue-50 rounded-lg p-3 text-xs space-y-1">
+                <p className="text-blue-800 font-medium">📱 Hướng dẫn:</p>
+                <ul className="text-blue-700 space-y-0.5 ml-4 list-disc">
+                  <li>Mở app banking và quét mã QR</li>
+                  <li>Kiểm tra số tiền và nội dung chuyển khoản</li>
+                  <li>Xác nhận thanh toán</li>
+                  <li>Hệ thống tự động xác nhận sau khi nhận tiền</li>
+                </ul>
+              </div>
+
+              <div className="mt-3 text-center">
+                <p className="text-[10px] text-[#8b857a]">
+                  ⚠️ Lưu ý: Vui lòng <strong>KHÔNG thay đổi</strong> nội dung chuyển khoản
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Tổng tiền */}

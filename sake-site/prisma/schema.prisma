@@ -103,6 +103,11 @@ model Booking {
   hasDeposit      Boolean       @default(false)
   depositAmount   Int           @default(0)
   depositPaid     Boolean       @default(false)
+  depositPaidAt   DateTime?     // Thời gian thanh toán cọc
+  depositTransferContent String? // Nội dung chuyển khoản (để đối chiếu)
+  depositSource   String?       // "WEB" hoặc "F2_ABC123" (tracking nguồn)
+  paymentQRCode   String?       // URL hoặc base64 của QR code
+  paymentBankRef  String?       // Mã tham chiếu từ ngân hàng (webhook)
   
   // Tracking
   source          BookingSource @default(WEB_DIRECT)
