@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { Suspense, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 
@@ -21,7 +21,7 @@ type Booking = {
   source: string;
 };
 
-export default function BookingLookupPage() {
+function BookingLookupContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [bookingId, setBookingId] = useState(searchParams.get("id") || "");
@@ -322,5 +322,13 @@ export default function BookingLookupPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function BookingLookupPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Đang tải...</div>}>
+      <BookingLookupContent />
+    </Suspense>
   );
 }

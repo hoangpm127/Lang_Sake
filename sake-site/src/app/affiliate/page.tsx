@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import AffiliateHub from "@/components/sections/AffiliateHub";
 import Footer from "@/components/layout/Footer";
 import Navbar from "@/components/layout/Navbar";
 import type { VibeMode } from "@/content/data";
 
-export default function AffiliatePage() {
+function AffiliatePageContent() {
   const [mode, setMode] = useState<VibeMode>("night");
 
   useEffect(() => {
@@ -25,5 +25,13 @@ export default function AffiliatePage() {
         <Footer />
       </div>
     </main>
+  );
+}
+
+export default function AffiliatePage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Đang tải...</div>}>
+      <AffiliatePageContent />
+    </Suspense>
   );
 }
