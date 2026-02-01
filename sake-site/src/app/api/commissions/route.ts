@@ -71,6 +71,35 @@ export async function GET(req: NextRequest) {
           createdAt: "desc",
         },
       });
+    } else if (roleFromCookie === "f2") {
+      // F2 members can see their own tier 1 commissions
+      commissions = await prisma.commission.findMany({
+        where: {
+          partnerId: userIdFromCookie,
+          tier: 1, // F2 only gets tier 1 commissions
+        },
+        include: {
+          partner: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
+          booking: {
+            select: {
+              id: true,
+              customerName: true,
+              dateTime: true,
+              finalTotal: true,
+              status: true,
+            },
+          },
+        },
+        orderBy: {
+          createdAt: "desc",
+        },
+      });
     } else {
       return NextResponse.json(
         { ok: false, message: "Forbidden" },

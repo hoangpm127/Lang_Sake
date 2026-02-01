@@ -27,10 +27,13 @@ export default function F2Dashboard() {
   const [error, setError] = useState<string | null>(null);
   const [showBookingForm, setShowBookingForm] = useState(false);
   const [userName, setUserName] = useState("Thành viên");
+  const [commissions, setCommissions] = useState<any[]>([]);
+  const [f1Manager, setF1Manager] = useState<any>(null);
 
   useEffect(() => {
     fetchBookings();
     fetchUserProfile();
+    fetchCommissions();
   }, []);
 
   const fetchUserProfile = async () => {
@@ -39,9 +42,24 @@ export default function F2Dashboard() {
       const data = await response.json();
       if (data.ok && data.user) {
         setUserName(data.user.name || "Thành viên");
+        if (data.user.referredBy) {
+          setF1Manager(data.user.referredBy);
+        }
       }
     } catch (err) {
       console.error("Failed to fetch user profile:", err);
+    }
+  };
+
+  const fetchCommissions = async () => {
+    try {
+      const response = await fetch("/api/commissions");
+      const data = await response.json();
+      if (data.ok) {
+        setCommissions(data.commissions || []);
+      }
+    } catch (err) {
+      console.error("Failed to fetch commissions:", err);
     }
   };
 
@@ -77,6 +95,16 @@ export default function F2Dashboard() {
     .reduce((sum, b) => sum + b.finalTotal, 0);
 
   const totalSaved = bookings.reduce((sum, b) => sum + b.discount, 0);
+
+  const tier1Commission = commissions
+    .filter((c) => c.tier === 1 && !c.isPaid)
+    .reduce((sum, c) => sum + c.amount, 0);
+  
+  const tier1CommissionPaid = commissions
+    .filter((c) => c.tier === 1 && c.isPaid)
+    .reduce((sum, c) => sum + c.amount, 0);
+
+  const totalTier1 = tier1Commission + tier1CommissionPaid;
 
   const confirmedBookings = bookings.filter((b) => b.status === "CONFIRMED").length;
   const upcomingBookings = bookings.filter((b) => {
@@ -218,8 +246,9 @@ export default function F2Dashboard() {
               </svg>
             </div>
             <div>
-              <p className="text-sm text-[#8b857a]">Đã tiết kiệm</p>
-              <p className="text-xl font-bold text-[#c9a24d]">{formatCurrency(totalSaved)}</p>
+              <p className="text-sm text-[#8b857a]">Hoa hồng T1 (Chưa trả)</p>
+              <p className="text-xl font-bold text-[#c9a24d]">{formatCurrency(tier1Commission)}</p>
+              <p className="text-xs text-[#8b857a] mt-1">Tổng: {formatCurrency(totalTier1)}</p>
             </div>
           </div>
         </div>
@@ -247,6 +276,41 @@ export default function F2Dashboard() {
           </div>
         )}
       </div>
+
+      {/* F1 Manager Information Card */}
+      {f1Manager && (
+        <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-6 border border-purple-200 shadow-sm">
+          <div className="flex items-start justify-between">
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 bg-purple-600 rounded-full flex items-center justify-center">
+                <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-purple-600 mb-1">Người quản lý (F1)</p>
+                <p className="text-lg font-bold text-purple-900">{f1Manager.name}</p>
+                <p className="text-sm text-purple-700">{f1Manager.email}</p>
+              </div>
+            </div>
+            <div className="text-right">
+              <p className="text-xs text-purple-600 mb-1">Thu nhập T2 từ bạn</p>
+              <p className="text-lg font-bold text-purple-900">
+                {formatCurrency(commissions.reduce((sum, c) => {
+                  // Calculate what F1 earned from F2's bookings (5%)
+                  return sum + (c.booking.finalTotal * 0.05);
+                }, 0))}
+              </p>
+              <p className="text-xs text-purple-600 mt-1">5% từ {commissions.length} đơn</p>
+            </div>
+          </div>
+          <div className="mt-4 p-4 bg-white/60 rounded-lg">
+            <p className="text-xs text-purple-900">
+              💡 <strong>Minh bạch hoa hồng:</strong> Khi bạn tạo đơn, bạn nhận 10% (Tier 1) và người quản lý F1 nhận thêm 5% (Tier 2) để hỗ trợ và phát triển đội.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Bookings List */}
       <div className="bg-white rounded-xl shadow-sm border border-black/5 overflow-hidden">

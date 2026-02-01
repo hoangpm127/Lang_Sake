@@ -122,12 +122,38 @@ export default function F1Dashboard() {
     .filter((b) => b.status !== "CANCELLED")
     .reduce((sum, b) => sum + b.finalTotal, 0);
 
-  // Tính hoa hồng: tier 2 (5%) cho F1 từ F2, tier 1 (10%) nếu F1 tạo
-  const tier2Revenue = bookings
-    .filter((b) => b.status !== "CANCELLED" && b.source === "F2_SELF")
-    .reduce((sum, b) => sum + b.finalTotal, 0);
+  // Fetch real commissions from API
+  const [commissions, setCommissions] = useState<any[]>([]);
+  const [commissionStats, setCommissionStats] = useState<any>(null);
+
+  useEffect(() => {
+    fetchCommissions();
+  }, []);
+
+  const fetchCommissions = async () => {
+    try {
+      const response = await fetch("/api/commissions");
+      const data = await response.json();
+      
+      if (data.ok) {
+        setCommissions(data.commissions);
+        setCommissionStats(data.stats);
+      }
+    } catch (err) {
+      console.error("Failed to fetch commissions:", err);
+    }
+  };
+
+  // Calculate tier-based earnings
+  const tier1Earnings = commissions
+    .filter((c) => c.tier === 1)
+    .reduce((sum, c) => sum + c.amount, 0);
   
-  const totalCommission = tier2Revenue * 0.05; // Tier 2: 5% từ F2
+  const tier2Earnings = commissions
+    .filter((c) => c.tier === 2)
+    .reduce((sum, c) => sum + c.amount, 0);
+  
+  const totalCommission = tier1Earnings + tier2Earnings;
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("vi-VN", {
@@ -303,9 +329,12 @@ export default function F1Dashboard() {
               </svg>
             </div>
             <div>
-              <p className="text-sm text-[#8b857a]">Hoa hồng Tier 2</p>
+              <p className="text-sm text-[#8b857a]">Tổng hoa hồng</p>
               <p className="text-xl font-bold text-[#c9a24d]">{formatCurrency(totalCommission)}</p>
-              <p className="text-xs text-[#8b857a] mt-1">5% từ F2</p>
+              <div className="flex items-center gap-2 mt-1">
+                <span className="text-xs px-2 py-0.5 bg-blue-50 text-blue-700 rounded">T1: {formatCurrency(tier1Earnings)}</span>
+                <span className="text-xs px-2 py-0.5 bg-purple-50 text-purple-700 rounded">T2: {formatCurrency(tier2Earnings)}</span>
+              </div>
             </div>
           </div>
         </div>
@@ -426,7 +455,10 @@ export default function F1Dashboard() {
               </thead>
               <tbody className="divide-y divide-black/5">
                 {filteredBookings.map((booking) => {
-                  const commission = booking.finalTotal * 0.05; // Tier 2: 5%
+                  // Find actual commission for this booking
+                  const bookingCommissions = commissions.filter(c => c.bookingId === booking.id);
+                  const commission = bookingCommissions.reduce((sum, c) => sum + c.amount, 0);
+                  const tierInfo = bookingCommissions.map(c => `T${c.tier}: ${formatCurrency(c.amount)}`).join(" + ");
                   const statusConfig = {
                     CONFIRMED: { bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-200", label: "Đã xác nhận" },
                     PENDING: { bg: "bg-yellow-50", text: "text-yellow-700", border: "border-yellow-200", label: "Chờ xác nhận" },
@@ -468,7 +500,10 @@ export default function F1Dashboard() {
                         <span className="text-sm font-semibold text-green-600">{formatCurrency(booking.finalTotal)}</span>
                       </td>
                       <td className="px-6 py-4 text-right">
-                        <span className="text-sm font-bold text-[#c9a24d]">{formatCurrency(commission)}</span>
+                        <div>
+                          <span className="text-sm font-bold text-[#c9a24d]">{formatCurrency(commission)}</span>
+                          {tierInfo && <p className="text-xs text-[#8b857a] mt-0.5">{tierInfo}</p>}
+                        </div>
                       </td>
                       <td className="px-6 py-4 text-center">
                         <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${config.bg} ${config.text} ${config.border}`}>

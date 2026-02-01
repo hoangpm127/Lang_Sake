@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import crypto from 'crypto';
 import { parseTransferContent } from '@/lib/vietqr';
+import { sendDepositConfirmationEmail, sendAdminPaymentAlertEmail } from '@/lib/email';
 
 const prisma = new PrismaClient();
 
@@ -167,7 +168,7 @@ export async function POST(request: NextRequest) {
           amount: tx.transferAmount,
           type: tx.transferType,
           content: tx.content,
-          code: tx.referenceCode || tx.code,
+          code: tx.referenceCode,
         });
         
         // Chỉ xử lý giao dịch tiền vào (transferType = "in")
@@ -179,7 +180,7 @@ export async function POST(request: NextRequest) {
         await processTransaction({
           amount: tx.transferAmount,
           description: tx.content,
-          bankRef: tx.referenceCode || (tx as any).code || '',
+          bankRef: tx.referenceCode || "",
           provider: 'sepay',
           rawData: tx,
         });
@@ -292,7 +293,17 @@ async function processTransaction(params: {
       received: amount,
       bookingId: booking.id,
     });
-    // Vẫn cập nhật nhưng ghi log để admin review
+    
+    // Send alert email to admin about mismatch
+    if (booking.email) {
+      await sendAdminPaymentAlertEmail({
+        bookingId: booking.id,
+        expectedAmount: expectedAmount,
+        receivedAmount: amount,
+        transferContent: description,
+        bankRef: bankRef,
+      }).catch(err => console.error('[Webhook] Failed to send admin alert:', err));
+    }
   }
 
   // Kiểm tra xem đã thanh toán chưa
@@ -315,9 +326,20 @@ async function processTransaction(params: {
 
   console.log('[Webhook] Booking updated successfully:', booking.id);
 
-  // TODO: Gửi email/Zalo thông báo cho khách hàng
-  // TODO: Gửi thông báo cho F1/F2 nếu có referral code
-  // TODO: Tạo commission nếu có referral code
+  // 🎉 PHASE 6: Send email notification to customer
+  if (booking.email) {
+    await sendDepositConfirmationEmail({
+      bookingId: booking.id,
+      customerName: booking.customerName,
+      customerEmail: booking.email,
+      depositAmount: amount,
+      transferContent: description,
+      paidAt: new Date(),
+    }).catch(err => console.error('[Webhook] Failed to send customer email:', err));
+  }
+
+  // TODO: Send Zalo notification
+  // TODO: If there's referral code, notify F1/F2 about commission
 }
 
 /**

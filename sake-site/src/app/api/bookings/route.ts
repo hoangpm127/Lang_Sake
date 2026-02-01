@@ -2,7 +2,7 @@
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/db";
 import { createBookingSchema } from "@/lib/validations";
-import { sendBookingConfirmationEmail } from "@/lib/email";
+import { sendBookingConfirmationEmail, sendCommissionEarnedEmail } from "@/lib/email";
 import { sendZaloOABookingConfirmation } from "@/lib/zalo";
 
 type BookingPayload = {
@@ -184,6 +184,20 @@ export async function POST(request: Request) {
             },
           },
         });
+
+        // 🎉 PHASE 6: Send commission notification to F1
+        if (f1Partner.email) {
+          await sendCommissionEarnedEmail({
+            partnerName: f1Partner.name,
+            partnerEmail: f1Partner.email,
+            partnerRole: "F1_PARTNER",
+            commissionAmount: commissionAmount,
+            tier: 1,
+            bookingId: booking.id,
+            customerName: booking.customerName,
+            bookingTotal: finalTotal,
+          }).catch(err => console.error('[Booking] Failed to send F1 commission email:', err));
+        }
       }
     }
 
@@ -222,6 +236,20 @@ export async function POST(request: Request) {
           },
         });
 
+        // 🎉 PHASE 6: Send commission notification to F2
+        if (f2Member.email) {
+          await sendCommissionEarnedEmail({
+            partnerName: f2Member.name,
+            partnerEmail: f2Member.email,
+            partnerRole: "F2_MEMBER",
+            commissionAmount: tier1Amount,
+            tier: 1,
+            bookingId: booking.id,
+            customerName: booking.customerName,
+            bookingTotal: finalTotal,
+          }).catch(err => console.error('[Booking] Failed to send F2 commission email:', err));
+        }
+
         // 2. Hoa hồng Tầng 2 cho F1 (người quản lý F2) - 5%
         if (f2Member.referredBy) {
           const tier2Rate = 5;
@@ -246,6 +274,20 @@ export async function POST(request: Request) {
               },
             },
           });
+
+          // 🎉 PHASE 6: Send commission notification to F1
+          if (f2Member.referredBy.email) {
+            await sendCommissionEarnedEmail({
+              partnerName: f2Member.referredBy.name,
+              partnerEmail: f2Member.referredBy.email,
+              partnerRole: "F1_PARTNER",
+              commissionAmount: tier2Amount,
+              tier: 2,
+              bookingId: booking.id,
+              customerName: booking.customerName,
+              bookingTotal: finalTotal,
+            }).catch(err => console.error('[Booking] Failed to send F1 commission email:', err));
+          }
         }
       }
     }
@@ -287,6 +329,20 @@ export async function POST(request: Request) {
 
         console.log(`✅ Commission Tier 1 created for F2: ${f2Member.name} - ${tier1Amount.toLocaleString()}đ`);
 
+        // 🎉 PHASE 6: Send commission notification to F2
+        if (f2Member.email) {
+          await sendCommissionEarnedEmail({
+            partnerName: f2Member.name,
+            partnerEmail: f2Member.email,
+            partnerRole: "F2_MEMBER",
+            commissionAmount: tier1Amount,
+            tier: 1,
+            bookingId: booking.id,
+            customerName: booking.customerName,
+            bookingTotal: finalTotal,
+          }).catch(err => console.error('[Booking] Failed to send F2 commission email (WEB_DIRECT):', err));
+        }
+
         // 2. Hoa hồng Tầng 2 cho F1 (người quản lý F2) - 5%
         if (f2Member.referredBy) {
           const tier2Rate = 5;
@@ -313,6 +369,20 @@ export async function POST(request: Request) {
           });
 
           console.log(`✅ Commission Tier 2 created for F1: ${f2Member.referredBy.name} - ${tier2Amount.toLocaleString()}đ`);
+
+          // 🎉 PHASE 6: Send commission notification to F1
+          if (f2Member.referredBy.email) {
+            await sendCommissionEarnedEmail({
+              partnerName: f2Member.referredBy.name,
+              partnerEmail: f2Member.referredBy.email,
+              partnerRole: "F1_PARTNER",
+              commissionAmount: tier2Amount,
+              tier: 2,
+              bookingId: booking.id,
+              customerName: booking.customerName,
+              bookingTotal: finalTotal,
+            }).catch(err => console.error('[Booking] Failed to send F1 commission email (WEB_DIRECT):', err));
+          }
         }
       }
     }
