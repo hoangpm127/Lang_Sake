@@ -108,7 +108,8 @@ export async function POST(request: Request) {
     const depositAmount = hasDeposit ? Math.round(subtotal * 0.1) : 0;
 
     // Xác định source và customer based on who creates the booking
-    let source: "WEB_DIRECT" | "F2_SELF" | "F1_CREATE" = "WEB_DIRECT";
+    let source: "WEB_DIRECT" | "F2_SELF" | "F1_CREATE" | "ADMIN_CREATE" =
+      "WEB_DIRECT";
     let customerId: string | undefined = undefined;
     let createdById: string | undefined = undefined;
 
