@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 
 const { b2b } = siteContent;
 
-const icons: Record<string, JSX.Element> = {
+const icons: Record<string, React.ReactNode> = {
   stage: (
     <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor">
       <path d="M3 7h18M5 7v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7" strokeWidth="1.5" />

@@ -40,6 +40,8 @@ export const siteContent = {
       mediaType: "image",
       mediaUrl:
         "https://images.unsplash.com/photo-1489515217757-5fd1be406fef?auto=format&fit=crop&w=2000&q=80",
+      posterUrl:
+        "https://images.unsplash.com/photo-1489515217757-5fd1be406fef?auto=format&fit=crop&w=2000&q=80",
       ambient: "Chim hót • Suối chảy",
     },
     night: {
@@ -66,6 +68,8 @@ export const siteContent = {
         "Không gian trong veo cho những cuộc hẹn tái tạo năng lượng.",
       mediaType: "image",
       mediaUrl:
+        "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1400&q=80",
+      posterUrl:
         "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1400&q=80",
       ambient: "Chim hót • Suối chảy",
       highlights: [

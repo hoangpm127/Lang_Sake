@@ -97,7 +97,7 @@ export async function GET() {
     });
 
     const statsMap = new Map(
-      bookingStats.map((stat) => [
+      bookingStats.map((stat: { createdById: string | null; _count: { id: number }; _sum: { finalTotal: number | null } }) => [
         stat.createdById,
         {
           bookingCount: stat._count.id,
@@ -107,15 +107,15 @@ export async function GET() {
     );
 
     // Build tree structure
-    const tree = admins.map((admin) => ({
+    const tree = admins.map((admin: typeof admins[0]) => ({
       ...admin,
       stats: statsMap.get(admin.id) || { bookingCount: 0, totalRevenue: 0 },
-      children: f1Partners.map((f1) => ({
+      children: f1Partners.map((f1: typeof f1Partners[0]) => ({
         ...f1,
         stats: statsMap.get(f1.id) || { bookingCount: 0, totalRevenue: 0 },
         children: f2Members
-          .filter((f2) => f2.referredById === f1.id)
-          .map((f2) => ({
+          .filter((f2: typeof f2Members[0]) => f2.referredById === f1.id)
+          .map((f2: typeof f2Members[0]) => ({
             ...f2,
             stats: statsMap.get(f2.id) || { bookingCount: 0, totalRevenue: 0 },
             children: [],

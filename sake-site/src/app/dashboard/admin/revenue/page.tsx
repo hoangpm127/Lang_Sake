@@ -154,21 +154,19 @@ export default function RevenuePage() {
           <div className="flex gap-2 bg-white border border-black/10 rounded-lg p-1">
             <button
               onClick={() => setChartType("bar")}
-              className={`px-3 py-1.5 rounded text-xs font-medium transition ${
-                chartType === "bar"
+              className={`px-3 py-1.5 rounded text-xs font-medium transition ${chartType === "bar"
                   ? "bg-[#c9a24d] text-white"
                   : "text-[#8b857a] hover:bg-[#f8f6f4]"
-              }`}
+                }`}
             >
               📊 Cột
             </button>
             <button
               onClick={() => setChartType("line")}
-              className={`px-3 py-1.5 rounded text-xs font-medium transition ${
-                chartType === "line"
+              className={`px-3 py-1.5 rounded text-xs font-medium transition ${chartType === "line"
                   ? "bg-[#c9a24d] text-white"
                   : "text-[#8b857a] hover:bg-[#f8f6f4]"
-              }`}
+                }`}
             >
               📈 Đường
             </button>
@@ -178,21 +176,19 @@ export default function RevenuePage() {
           <div className="flex gap-2">
             <button
               onClick={() => setView("daily")}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-                view === "daily"
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition ${view === "daily"
                   ? "bg-[#c9a24d] text-white"
                   : "bg-white text-[#8b857a] border border-black/10"
-              }`}
+                }`}
             >
               30 ngày
             </button>
             <button
               onClick={() => setView("monthly")}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-                view === "monthly"
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition ${view === "monthly"
                   ? "bg-[#c9a24d] text-white"
                   : "bg-white text-[#8b857a] border border-black/10"
-              }`}
+                }`}
             >
               12 tháng
             </button>
@@ -253,76 +249,76 @@ export default function RevenuePage() {
           <div className="space-y-3">
             {view === "daily"
               ? dailyRevenue.map((item) => {
-                  const percentage = (item.revenue / maxRevenue) * 100;
-                  return (
-                    <div key={item.date} className="flex items-center gap-4">
-                      <div className="w-20 text-xs text-[#8b857a]">
-                        {new Date(item.date).toLocaleDateString("vi-VN", {
-                          day: "2-digit",
-                          month: "2-digit",
-                        })}
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <div className="flex-1 h-8 bg-[#f8f6f4] rounded-lg overflow-hidden">
-                            <div
-                              className="h-full bg-gradient-to-r from-[#c9a24d] to-[#b8933d] transition-all duration-500 flex items-center justify-end pr-2"
-                              style={{ width: `${percentage}%` }}
-                            >
-                              {percentage > 20 && (
-                                <span className="text-xs font-medium text-white">
-                                  {formatCurrency(item.revenue)}
-                                </span>
-                              )}
-                            </div>
+                const percentage = (item.revenue / maxRevenue) * 100;
+                return (
+                  <div key={item.date} className="flex items-center gap-4">
+                    <div className="w-20 text-xs text-[#8b857a]">
+                      {new Date(item.date).toLocaleDateString("vi-VN", {
+                        day: "2-digit",
+                        month: "2-digit",
+                      })}
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 h-8 bg-[#f8f6f4] rounded-lg overflow-hidden">
+                          <div
+                            className="h-full bg-gradient-to-r from-[#c9a24d] to-[#b8933d] transition-all duration-500 flex items-center justify-end pr-2"
+                            style={{ width: `${percentage}%` }}
+                          >
+                            {percentage > 20 && (
+                              <span className="text-xs font-medium text-white">
+                                {formatCurrency(item.revenue)}
+                              </span>
+                            )}
                           </div>
-                          {percentage <= 20 && (
-                            <span className="text-xs font-medium text-[#8b857a] w-32">
-                              {formatCurrency(item.revenue)}
-                            </span>
-                          )}
                         </div>
-                      </div>
-                      <div className="w-14 text-xs text-[#8b857a] text-right">
-                        {item.bookingCount} đơn
+                        {percentage <= 20 && (
+                          <span className="text-xs font-medium text-[#8b857a] w-32">
+                            {formatCurrency(item.revenue)}
+                          </span>
+                        )}
                       </div>
                     </div>
-                  );
-                })
+                    <div className="w-14 text-xs text-[#8b857a] text-right">
+                      {item.bookingCount} đơn
+                    </div>
+                  </div>
+                );
+              })
               : monthlyRevenue.map((item) => {
-                  const percentage = (item.revenue / maxRevenue) * 100;
-                  return (
-                    <div key={item.month} className="flex items-center gap-4">
-                      <div className="w-20 text-xs text-[#8b857a]">
-                        {item.month.split("-")[1]}/{item.month.split("-")[0].slice(2)}
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <div className="flex-1 h-10 bg-[#f8f6f4] rounded-lg overflow-hidden">
-                            <div
-                              className="h-full bg-gradient-to-r from-[#c9a24d] to-[#b8933d] transition-all duration-500 flex items-center justify-end pr-3"
-                              style={{ width: `${percentage}%` }}
-                            >
-                              {percentage > 20 && (
-                                <span className="text-sm font-medium text-white">
-                                  {formatCurrency(item.revenue)}
-                                </span>
-                              )}
-                            </div>
+                const percentage = (item.revenue / maxRevenue) * 100;
+                return (
+                  <div key={item.month} className="flex items-center gap-4">
+                    <div className="w-20 text-xs text-[#8b857a]">
+                      {item.month.split("-")[1]}/{item.month.split("-")[0].slice(2)}
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 h-10 bg-[#f8f6f4] rounded-lg overflow-hidden">
+                          <div
+                            className="h-full bg-gradient-to-r from-[#c9a24d] to-[#b8933d] transition-all duration-500 flex items-center justify-end pr-3"
+                            style={{ width: `${percentage}%` }}
+                          >
+                            {percentage > 20 && (
+                              <span className="text-sm font-medium text-white">
+                                {formatCurrency(item.revenue)}
+                              </span>
+                            )}
                           </div>
-                          {percentage <= 20 && (
-                            <span className="text-sm font-medium text-[#8b857a] w-32">
-                              {formatCurrency(item.revenue)}
-                            </span>
-                          )}
                         </div>
-                      </div>
-                      <div className="w-14 text-xs text-[#8b857a] text-right">
-                        {item.bookingCount} đơn
+                        {percentage <= 20 && (
+                          <span className="text-sm font-medium text-[#8b857a] w-32">
+                            {formatCurrency(item.revenue)}
+                          </span>
+                        )}
                       </div>
                     </div>
-                  );
-                })}
+                    <div className="w-14 text-xs text-[#8b857a] text-right">
+                      {item.bookingCount} đơn
+                    </div>
+                  </div>
+                );
+              })}
           </div>
         ) : (
           /* Line Chart */
@@ -401,8 +397,8 @@ export default function RevenuePage() {
                             fill="#8b857a"
                           >
                             {view === "daily"
-                              ? new Date(item.date).getDate()
-                              : item.month.split("-")[1]}
+                              ? new Date((item as DailyRevenue).date).getDate()
+                              : (item as MonthlyRevenue).month.split("-")[1]}
                           </text>
 
                           {/* Value tooltip */}

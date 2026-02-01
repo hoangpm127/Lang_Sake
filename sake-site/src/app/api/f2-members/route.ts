@@ -51,11 +51,11 @@ export async function GET() {
     });
 
     // Tính toán stats cho từng F2
-    const f2Stats = f2Members.map((f2) => {
+    const f2Stats = f2Members.map((f2: typeof f2Members[0]) => {
       const totalBookings = f2.bookingsAsCustomer.length;
-      const totalRevenue = f2.bookingsAsCustomer.reduce((sum: number, b: any) => sum + b.finalTotal, 0);
-      const completedBookings = f2.bookingsAsCustomer.filter((b: any) => b.status === "COMPLETED").length;
-      
+      const totalRevenue = f2.bookingsAsCustomer.reduce((sum: number, b: { finalTotal: number }) => sum + b.finalTotal, 0);
+      const completedBookings = f2.bookingsAsCustomer.filter((b: { status: string }) => b.status === "COMPLETED").length;
+
       return {
         id: f2.id,
         name: f2.name,

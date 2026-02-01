@@ -58,29 +58,29 @@ export async function GET() {
     // Calculate stats
     const stats = {
       total: commissions.length,
-      pending: commissions.filter((c) => c.status === "PENDING").length,
-      approved: commissions.filter((c) => c.status === "APPROVED").length,
-      paid: commissions.filter((c) => c.status === "PAID").length,
-      rejected: commissions.filter((c) => c.status === "REJECTED").length,
-      totalAmount: commissions.reduce((sum, c) => sum + c.amount, 0),
+      pending: commissions.filter((c: { status: string }) => c.status === "PENDING").length,
+      approved: commissions.filter((c: { status: string }) => c.status === "APPROVED").length,
+      paid: commissions.filter((c: { status: string }) => c.status === "PAID").length,
+      rejected: commissions.filter((c: { status: string }) => c.status === "REJECTED").length,
+      totalAmount: commissions.reduce((sum: number, c: { amount: number }) => sum + c.amount, 0),
       pendingAmount: commissions
-        .filter((c) => c.status === "PENDING")
-        .reduce((sum, c) => sum + c.amount, 0),
+        .filter((c: { status: string }) => c.status === "PENDING")
+        .reduce((sum: number, c: { amount: number }) => sum + c.amount, 0),
       approvedAmount: commissions
-        .filter((c) => c.status === "APPROVED")
-        .reduce((sum, c) => sum + c.amount, 0),
+        .filter((c: { status: string }) => c.status === "APPROVED")
+        .reduce((sum: number, c: { amount: number }) => sum + c.amount, 0),
       paidAmount: commissions
-        .filter((c) => c.status === "PAID")
-        .reduce((sum, c) => sum + c.amount, 0),
+        .filter((c: { status: string }) => c.status === "PAID")
+        .reduce((sum: number, c: { amount: number }) => sum + c.amount, 0),
       // Tier breakdown
-      tier1Count: commissions.filter((c) => c.tier === 1).length,
-      tier2Count: commissions.filter((c) => c.tier === 2).length,
+      tier1Count: commissions.filter((c: { tier: number }) => c.tier === 1).length,
+      tier2Count: commissions.filter((c: { tier: number }) => c.tier === 2).length,
       tier1Amount: commissions
-        .filter((c) => c.tier === 1)
-        .reduce((sum, c) => sum + c.amount, 0),
+        .filter((c: { tier: number }) => c.tier === 1)
+        .reduce((sum: number, c: { amount: number }) => sum + c.amount, 0),
       tier2Amount: commissions
-        .filter((c) => c.tier === 2)
-        .reduce((sum, c) => sum + c.amount, 0),
+        .filter((c: { tier: number }) => c.tier === 2)
+        .reduce((sum: number, c: { amount: number }) => sum + c.amount, 0),
     };
 
     // For F2, also get their F1 manager's commission from their bookings
