@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import UserTreeView from "./UserTreeView";
+import AdminPaymentDashboard from "./AdminPaymentDashboard";
 import { FaCheck, FaTimes, FaClock, FaCheckCircle, FaTimesCircle, FaClipboardList, FaSitemap } from "react-icons/fa";
 
 type Booking = {
@@ -58,7 +59,7 @@ type SourceStats = {
 };
 
 export default function AdminDashboard() {
-  const [activeTab, setActiveTab] = useState<"bookings" | "organization">("bookings");
+  const [activeTab, setActiveTab] = useState<"bookings" | "organization" | "payments">("bookings");
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -275,7 +276,11 @@ export default function AdminDashboard() {
       {/* Header */}
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-serif text-[#1a1a1a]">
-          {activeTab === "bookings" ? "Quản Lý Đơn Hàng" : "Quản Lý Nhân Sự"}
+          {activeTab === "bookings" 
+            ? "Quản Lý Đơn Hàng" 
+            : activeTab === "payments" 
+            ? "Quản Lý Thanh Toán" 
+            : "Quản Lý Nhân Sự"}
         </h1>
         {activeTab === "bookings" && (
           <button
@@ -301,6 +306,17 @@ export default function AdminDashboard() {
           Đơn Hàng
         </button>
         <button
+          onClick={() => setActiveTab("payments")}
+          className={`flex items-center gap-2 px-6 py-3 font-medium transition-all ${
+            activeTab === "payments"
+              ? "text-[#c9a24d] border-b-2 border-[#c9a24d]"
+              : "text-gray-500 hover:text-gray-700"
+          }`}
+        >
+          <FaCheckCircle />
+          Thanh Toán
+        </button>
+        <button
           onClick={() => setActiveTab("organization")}
           className={`flex items-center gap-2 px-6 py-3 font-medium transition-all ${
             activeTab === "organization"
@@ -316,6 +332,8 @@ export default function AdminDashboard() {
       {/* Tab Content */}
       {activeTab === "organization" ? (
         <UserTreeView />
+      ) : activeTab === "payments" ? (
+        <AdminPaymentDashboard />
       ) : (
         <>
       {/* Statistics Cards */}

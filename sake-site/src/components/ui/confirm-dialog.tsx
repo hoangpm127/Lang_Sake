@@ -7,7 +7,8 @@ interface ConfirmDialogProps {
   onClose: () => void;
   onConfirm: () => void | Promise<void>;
   title: string;
-  description: string;
+  description?: string;
+  children?: React.ReactNode;
   confirmText?: string;
   cancelText?: string;
   variant?: "danger" | "warning" | "info";
@@ -20,6 +21,7 @@ export function ConfirmDialog({
   onConfirm,
   title,
   description,
+  children,
   confirmText = "Xác nhận",
   cancelText = "Hủy",
   variant = "danger",
@@ -48,7 +50,8 @@ export function ConfirmDialog({
       {/* Dialog */}
       <div className="relative bg-white rounded-2xl shadow-xl max-w-md w-full mx-4 p-6 animate-in fade-in zoom-in duration-200">
         <h3 className="text-xl font-semibold text-gray-900 mb-2">{title}</h3>
-        <p className="text-gray-600 mb-6">{description}</p>
+        {description && <p className="text-gray-600 mb-6">{description}</p>}
+        {children && <div className="mb-6">{children}</div>}
 
         <div className="flex gap-3 justify-end">
           <button

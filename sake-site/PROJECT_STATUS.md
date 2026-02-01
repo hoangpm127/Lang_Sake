@@ -141,7 +141,7 @@ Web direct → Không có commission
 
 ---
 
-### **Phase 6: Email Notifications** ✅ 100% 🆕
+### **Phase 6: Email Notifications** ✅ 100%
 **Date:** February 1, 2026
 
 **Features:**
@@ -164,7 +164,40 @@ Web direct → Không có commission
 - `src/app/api/bookings/route.ts` - Commission emails
 
 **Documentation:**
-- [PHASE6_EMAIL_NOTIFICATIONS.md](PHASE6_EMAIL_NOTIFICATIONS.md) 🆕
+- [PHASE6_EMAIL_NOTIFICATIONS.md](PHASE6_EMAIL_NOTIFICATIONS.md)
+
+**Status:** Production Ready ✨
+
+---
+
+### **Phase 7: Payment Dashboard** ✅ 100% 🆕
+**Date:** February 1, 2026
+
+**Features:**
+- ✅ Admin payment management tab
+- ✅ Manual deposit confirmation
+- ✅ Refund handling
+- ✅ Payment reconciliation tool (4 issue types)
+- ✅ Filters: status, source, date range
+- ✅ Search: name, phone, transaction ref
+- ✅ CSV export for accounting
+- ✅ Real-time payment stats
+
+**Reconciliation Issues:**
+1. **Unpaid deposits** - Chưa thanh toán
+2. **Missing bank ref** - Thiếu mã GD
+3. **Pending confirmations** - Đã trả chưa confirm
+4. **Cancelled with paid** - Đã hủy cần refund
+
+**Files:**
+- `src/app/api/admin/payments/route.ts` - New API
+- `src/app/api/admin/reconciliation/route.ts` - New API
+- `src/components/dashboard/AdminPaymentDashboard.tsx` - New component
+- `src/components/dashboard/AdminDashboard.tsx` - Added tab
+- `src/components/ui/confirm-dialog.tsx` - Support children
+
+**Documentation:**
+- [PHASE7_PAYMENT_DASHBOARD.md](PHASE7_PAYMENT_DASHBOARD.md) 🆕
 
 **Status:** Production Ready ✨
 
