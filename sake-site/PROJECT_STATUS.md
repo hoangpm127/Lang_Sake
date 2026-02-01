@@ -170,7 +170,7 @@ Web direct → Không có commission
 
 ---
 
-### **Phase 7: Payment Dashboard** ✅ 100% 🆕
+### **Phase 7: Payment Dashboard** ✅ 100%
 **Date:** February 1, 2026
 
 **Features:**
@@ -197,7 +197,54 @@ Web direct → Không có commission
 - `src/components/ui/confirm-dialog.tsx` - Support children
 
 **Documentation:**
-- [PHASE7_PAYMENT_DASHBOARD.md](PHASE7_PAYMENT_DASHBOARD.md) 🆕
+- [PHASE7_PAYMENT_DASHBOARD.md](PHASE7_PAYMENT_DASHBOARD.md)
+
+**Status:** Production Ready ✨
+
+---
+
+### **Phase 8: Analytics & Reports** ✅ 100% 🆕
+**Date:** February 1, 2026
+
+**Features:**
+- ✅ Analytics dashboard với 4 KPI cards
+- ✅ 6 interactive charts (Recharts):
+  - Revenue trend (Area chart)
+  - Bookings trend (Bar chart)
+  - Commission by tier (Stacked area)
+  - Source breakdown (Pie chart)
+  - Deposit rate trend
+  - Source trend (Stacked)
+- ✅ Date range filtering
+- ✅ Quick select (7/30/90 days)
+- ✅ Group by: day/week/month
+- ✅ Top F1 partners ranking table
+- ✅ CSV report export
+
+**Metrics:**
+- Revenue, bookings, conversion rate
+- Deposit rate, commission tracking
+- Source performance analysis
+- F1/F2 performance leaderboard
+
+**Charts:**
+- Area, Bar, Pie, Stacked area
+- Responsive & mobile-friendly
+- Vietnamese currency formatting
+- Interactive tooltips & legends
+
+**Files:**
+- `src/app/api/analytics/overview/route.ts` - New API
+- `src/app/api/analytics/trends/route.ts` - New API
+- `src/components/dashboard/AnalyticsDashboard.tsx` - New component
+- `src/components/dashboard/AdminDashboard.tsx` - Added tab
+
+**Dependencies:**
+- `recharts` - Charting library
+- `date-fns` - Date utilities
+
+**Documentation:**
+- [PHASE8_ANALYTICS_REPORTS.md](PHASE8_ANALYTICS_REPORTS.md) 🆕
 
 **Status:** Production Ready ✨
 

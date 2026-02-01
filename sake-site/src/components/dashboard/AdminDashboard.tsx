@@ -5,7 +5,8 @@ import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import UserTreeView from "./UserTreeView";
 import AdminPaymentDashboard from "./AdminPaymentDashboard";
-import { FaCheck, FaTimes, FaClock, FaCheckCircle, FaTimesCircle, FaClipboardList, FaSitemap } from "react-icons/fa";
+import AnalyticsDashboard from "./AnalyticsDashboard";
+import { FaCheck, FaTimes, FaClock, FaCheckCircle, FaTimesCircle, FaClipboardList, FaSitemap, FaChartBar } from "react-icons/fa";
 
 type Booking = {
   id: string;
@@ -59,7 +60,7 @@ type SourceStats = {
 };
 
 export default function AdminDashboard() {
-  const [activeTab, setActiveTab] = useState<"bookings" | "organization" | "payments">("bookings");
+  const [activeTab, setActiveTab] = useState<"bookings" | "organization" | "payments" | "analytics">("bookings");
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -279,7 +280,9 @@ export default function AdminDashboard() {
           {activeTab === "bookings" 
             ? "Quản Lý Đơn Hàng" 
             : activeTab === "payments" 
-            ? "Quản Lý Thanh Toán" 
+            ? "Quản Lý Thanh Toán"
+            : activeTab === "analytics"
+            ? "Analytics & Reports" 
             : "Quản Lý Nhân Sự"}
         </h1>
         {activeTab === "bookings" && (
@@ -317,6 +320,17 @@ export default function AdminDashboard() {
           Thanh Toán
         </button>
         <button
+          onClick={() => setActiveTab("analytics")}
+          className={`flex items-center gap-2 px-6 py-3 font-medium transition-all ${
+            activeTab === "analytics"
+              ? "text-[#c9a24d] border-b-2 border-[#c9a24d]"
+              : "text-gray-500 hover:text-gray-700"
+          }`}
+        >
+          <FaChartBar />
+          Analytics
+        </button>
+        <button
           onClick={() => setActiveTab("organization")}
           className={`flex items-center gap-2 px-6 py-3 font-medium transition-all ${
             activeTab === "organization"
@@ -334,6 +348,8 @@ export default function AdminDashboard() {
         <UserTreeView />
       ) : activeTab === "payments" ? (
         <AdminPaymentDashboard />
+      ) : activeTab === "analytics" ? (
+        <AnalyticsDashboard />
       ) : (
         <>
       {/* Statistics Cards */}
