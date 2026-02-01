@@ -1,0 +1,12 @@
+{
+  "gateway": "TPB",
+  "transactionDate": "2026-01-30 21:43:33",
+  "accountNumber": "34522229999",
+  "subAccount": null,
+  "transferType": "in",
+  "transferAmount": 133200,
+  "accumulated": 610596,
+  "code": "068V602260302462",
+  "content": "LANGSAKE Bcml0zrd1 WEB",
+  "description": "Pay > Hook 1 > 068V602260302462"
+}
